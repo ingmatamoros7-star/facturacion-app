@@ -1,0 +1,4 @@
+node_modules/
+facturacion.db
+facturacion.db-wal
+facturacion.db-shm

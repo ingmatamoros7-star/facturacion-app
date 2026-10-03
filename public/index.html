@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Facturación</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+<nav>
+  <span class="logo">💼 Facturación</span>
+  <button class="active" onclick="showSection('clientes')">Clientes</button>
+  <button onclick="showSection('productos')">Productos</button>
+  <button onclick="showSection('ventas')">Ventas</button>
+  <button onclick="showSection('cartera')">Cartera Vencida</button>
+</nav>
+
+<div class="container">
+
+  <!-- CLIENTES -->
+  <div id="sec-clientes" class="section active">
+    <h2>
+      Clientes
+      <button class="btn btn-primary" onclick="showClienteForm()">+ Nuevo Cliente</button>
+    </h2>
+    <div id="cliente-form-container"></div>
+    <table>
+      <thead>
+        <tr><th>Nombre</th><th>Teléfono</th><th>Email</th><th>Acciones</th></tr>
+      </thead>
+      <tbody id="clientes-table"></tbody>
+    </table>
+  </div>
+
+  <!-- PRODUCTOS -->
+  <div id="sec-productos" class="section">
+    <h2>
+      Productos
+      <button class="btn btn-primary" onclick="showProductoForm()">+ Nuevo Producto</button>
+    </h2>
+    <div id="producto-form-container"></div>
+    <table>
+      <thead>
+        <tr><th>Nombre</th><th>Descripción</th><th>Precio Unitario</th><th>Acciones</th></tr>
+      </thead>
+      <tbody id="productos-table"></tbody>
+    </table>
+  </div>
+
+  <!-- VENTAS -->
+  <div id="sec-ventas" class="section">
+    <h2>
+      Ventas
+      <button class="btn btn-primary" onclick="showNuevaVenta()">+ Nueva Venta</button>
+    </h2>
+    <div id="venta-form-container"></div>
+    <table>
+      <thead>
+        <tr><th>#</th><th>Cliente</th><th>Fecha</th><th>Total</th><th>Pagado</th><th>Estado</th><th>Acciones</th></tr>
+      </thead>
+      <tbody id="ventas-table"></tbody>
+    </table>
+  </div>
+
+  <!-- CARTERA VENCIDA -->
+  <div id="sec-cartera" class="section">
+    <h2>Cartera Vencida</h2>
+    <div class="stat-cards" id="cartera-stats"></div>
+    <table>
+      <thead>
+        <tr><th>Cliente</th><th>Teléfono</th><th>Fecha Venta</th><th>Total</th><th>Pagado</th><th>Saldo</th><th>Días</th><th>Acción</th></tr>
+      </thead>
+      <tbody id="cartera-table"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- MODAL para ver detalle de venta y registrar pagos -->
+<div id="modal-overlay" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<script src="/js/app.js"></script>
+</body>
+</html>
