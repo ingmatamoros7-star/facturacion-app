@@ -1,6 +1,7 @@
 const API = '';
 
 // ============ UTILIDADES ============
+let toastCount = 0;
 function toast(msg, type = '') {
   const icon = type === 'success'
     ? '<svg class="toast-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>'
@@ -8,10 +9,17 @@ function toast(msg, type = '') {
     ? '<svg class="toast-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
     : '';
   const el = document.createElement('div');
+  const offset = toastCount * 60;
+  toastCount++;
   el.className = 'toast ' + type;
+  el.style.bottom = (24 + offset) + 'px';
   el.innerHTML = icon + '<span>' + esc(msg) + '</span>';
   document.body.appendChild(el);
-  setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(10px)'; setTimeout(() => el.remove(), 300); }, 3000);
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(10px)';
+    setTimeout(() => { el.remove(); toastCount = Math.max(0, toastCount - 1); }, 300);
+  }, 3000);
 }
 
 function formatMoney(n) {
@@ -37,6 +45,40 @@ async function api(path, opts = {}) {
     toast(err.message, 'error');
     throw err;
   }
+}
+
+// ============ LOADING ============
+function showLoading() {
+  document.getElementById('loading-overlay').style.display = 'flex';
+}
+function hideLoading() {
+  document.getElementById('loading-overlay').style.display = 'none';
+}
+
+// ============ CONFIRM DIALOG ============
+function confirmAction(title, message, btnText = 'Eliminar') {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('confirm-overlay');
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-message').textContent = message;
+    document.getElementById('confirm-ok').textContent = btnText;
+    overlay.style.display = 'flex';
+
+    const onOk = () => { cleanup(); resolve(true); };
+    const onCancel = () => { cleanup(); resolve(false); };
+    const onKey = e => { if (e.key === 'Escape') onCancel(); };
+
+    function cleanup() {
+      overlay.style.display = 'none';
+      document.getElementById('confirm-ok').removeEventListener('click', onOk);
+      document.getElementById('confirm-cancel').removeEventListener('click', onCancel);
+      document.removeEventListener('keydown', onKey);
+    }
+
+    document.getElementById('confirm-ok').addEventListener('click', onOk);
+    document.getElementById('confirm-cancel').addEventListener('click', onCancel);
+    document.addEventListener('keydown', onKey);
+  });
 }
 
 // ============ NAVEGACIÓN ============
@@ -141,7 +183,7 @@ async function loadDashboard() {
     const carteraResumen = document.getElementById('dash-cartera-resumen');
     const carteraTop = cartera.cartera.slice(0, 5);
     carteraResumen.innerHTML = carteraTop.length ? carteraTop.map(r => `
-      <div class="panel-item">
+      <div class="panel-item" style="cursor:pointer" onclick="verVenta(${r.venta_id})">
         <div class="panel-item-left">
           <span class="panel-item-name">${esc(r.cliente_nombre)}</span>
           <span class="panel-item-sub">${r.dias_transcurridos} días pendiente</span>
@@ -159,8 +201,10 @@ async function loadDashboard() {
 let allClientes = [];
 
 async function loadClientes() {
-  allClientes = await api('/api/clientes');
-  renderClientes(allClientes);
+  try {
+    allClientes = await api('/api/clientes');
+    renderClientes(allClientes);
+  } catch (e) { /* api() already toasts */ }
 }
 
 function renderClientes(list) {
@@ -239,34 +283,51 @@ async function saveCliente(id) {
   };
   if (!body.nombre) return toast('El nombre es requerido', 'error');
 
-  if (id) {
-    await api('/api/clientes/' + id, { method: 'PUT', body });
-  } else {
-    await api('/api/clientes', { method: 'POST', body });
+  try {
+    showLoading();
+    if (id) {
+      await api('/api/clientes/' + id, { method: 'PUT', body });
+    } else {
+      await api('/api/clientes', { method: 'POST', body });
+    }
+    toast('Cliente guardado', 'success');
+    document.getElementById('cliente-form-container').innerHTML = '';
+    loadClientes();
+  } finally {
+    hideLoading();
   }
-  toast('Cliente guardado', 'success');
-  document.getElementById('cliente-form-container').innerHTML = '';
-  loadClientes();
 }
 
 async function editCliente(id) {
-  const c = await api('/api/clientes/' + id);
-  showClienteForm(c);
+  try {
+    const c = await api('/api/clientes/' + id);
+    showClienteForm(c);
+  } catch (e) { /* api() toasts */ }
 }
 
 async function deleteCliente(id) {
-  if (!confirm('¿Eliminar este cliente?')) return;
-  await api('/api/clientes/' + id, { method: 'DELETE' });
-  toast('Cliente eliminado', 'success');
-  loadClientes();
+  const ok = await confirmAction(
+    'Eliminar Cliente',
+    '¿Estás seguro de que deseas eliminar este cliente? Esta acción no se puede deshacer.'
+  );
+  if (!ok) return;
+  try {
+    showLoading();
+    await api('/api/clientes/' + id, { method: 'DELETE' });
+    toast('Cliente eliminado', 'success');
+    loadClientes();
+  } catch (e) { /* api() toasts */ }
+  finally { hideLoading(); }
 }
 
 // ============ PRODUCTOS ============
 let allProductos = [];
 
 async function loadProductos() {
-  allProductos = await api('/api/productos');
-  renderProductos(allProductos);
+  try {
+    allProductos = await api('/api/productos');
+    renderProductos(allProductos);
+  } catch (e) { /* api() already toasts */ }
 }
 
 function renderProductos(list) {
@@ -340,37 +401,60 @@ async function saveProducto(id) {
     descripcion: document.getElementById('pf-descripcion').value.trim(),
   };
   if (!body.nombre || isNaN(body.precio_unitario)) return toast('Nombre y precio son requeridos', 'error');
+  if (body.precio_unitario < 0) return toast('El precio no puede ser negativo', 'error');
 
-  if (id) {
-    await api('/api/productos/' + id, { method: 'PUT', body });
-  } else {
-    await api('/api/productos', { method: 'POST', body });
+  try {
+    showLoading();
+    if (id) {
+      await api('/api/productos/' + id, { method: 'PUT', body });
+    } else {
+      await api('/api/productos', { method: 'POST', body });
+    }
+    toast('Producto guardado', 'success');
+    document.getElementById('producto-form-container').innerHTML = '';
+    loadProductos();
+  } finally {
+    hideLoading();
   }
-  toast('Producto guardado', 'success');
-  document.getElementById('producto-form-container').innerHTML = '';
-  loadProductos();
 }
 
 async function editProducto(id) {
-  const p = await api('/api/productos/' + id);
-  showProductoForm(p);
+  try {
+    const p = await api('/api/productos/' + id);
+    showProductoForm(p);
+  } catch (e) { /* api() toasts */ }
 }
 
 async function deleteProducto(id) {
-  if (!confirm('¿Eliminar este producto?')) return;
-  await api('/api/productos/' + id, { method: 'DELETE' });
-  toast('Producto eliminado', 'success');
-  loadProductos();
+  const ok = await confirmAction(
+    'Eliminar Producto',
+    '¿Estás seguro de que deseas eliminar este producto? Esta acción no se puede deshacer.'
+  );
+  if (!ok) return;
+  try {
+    showLoading();
+    await api('/api/productos/' + id, { method: 'DELETE' });
+    toast('Producto eliminado', 'success');
+    loadProductos();
+  } catch (e) { /* api() toasts */ }
+  finally { hideLoading(); }
 }
 
 // ============ VENTAS ============
 let productosCache = [];
+let allVentas = [];
 
 async function loadVentas() {
-  const ventas = await api('/api/ventas');
+  try {
+    allVentas = await api('/api/ventas');
+    renderVentas(allVentas);
+  } catch (e) { /* api() already toasts */ }
+}
+
+function renderVentas(ventas) {
   const tbody = document.getElementById('ventas-table');
   tbody.innerHTML = ventas.length ? ventas.map(v => `
-    <tr>
+    <tr data-clickable onclick="verVenta(${v.id})">
       <td><span style="color:var(--gray-500);font-weight:500">#${v.id}</span></td>
       <td><strong>${esc(v.cliente_nombre)}</strong></td>
       <td>${formatDate(v.fecha)}</td>
@@ -384,10 +468,10 @@ async function loadVentas() {
       </td>
       <td class="text-right">
         <div class="td-actions">
-          <button class="btn-icon" onclick="verVenta(${v.id})" title="Ver detalle">
+          <button class="btn-icon" onclick="event.stopPropagation();verVenta(${v.id})" title="Ver detalle">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
-          <button class="btn-icon danger" onclick="deleteVenta(${v.id})" title="Eliminar">
+          <button class="btn-icon danger" onclick="event.stopPropagation();deleteVenta(${v.id})" title="Eliminar">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           </button>
         </div>
@@ -405,43 +489,58 @@ async function loadVentas() {
     </td></tr>`;
 }
 
+function filterVentas(q) {
+  const term = q.toLowerCase();
+  renderVentas(allVentas.filter(v =>
+    v.cliente_nombre.toLowerCase().includes(term) ||
+    v.estado.toLowerCase().includes(term) ||
+    ('#' + v.id).includes(term)
+  ));
+}
+
 async function showNuevaVenta() {
-  const [clientes, productos] = await Promise.all([api('/api/clientes'), api('/api/productos')]);
-  productosCache = productos;
+  try {
+    const [clientes, productos] = await Promise.all([api('/api/clientes'), api('/api/productos')]);
+    productosCache = productos;
 
-  if (!clientes.length) return toast('Primero registra al menos un cliente', 'error');
-  if (!productos.length) return toast('Primero registra al menos un producto', 'error');
+    if (!clientes.length) return toast('Primero registra al menos un cliente', 'error');
+    if (!productos.length) return toast('Primero registra al menos un producto', 'error');
 
-  document.getElementById('venta-form-container').innerHTML = `
-    <div class="form-card">
-      <h3>Nueva Venta</h3>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Cliente *</label>
-          <select id="vf-cliente">
-            <option value="">Seleccionar cliente...</option>
-            ${clientes.map(c => `<option value="${c.id}">${esc(c.nombre)}</option>`).join('')}
-          </select>
+    document.getElementById('venta-form-container').innerHTML = `
+      <div class="form-card">
+        <h3>Nueva Venta</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Cliente *</label>
+            <select id="vf-cliente">
+              <option value="">Seleccionar cliente...</option>
+              ${clientes.map(c => `<option value="${c.id}">${esc(c.nombre)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Notas</label>
+            <input id="vf-notas" placeholder="Notas adicionales (opcional)">
+          </div>
+        </div>
+        <div class="venta-items" id="venta-items">
+          <label>Productos</label>
+        </div>
+        <button class="btn btn-outline btn-sm" style="margin-bottom:16px" onclick="addVentaItem()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Agregar producto
+        </button>
+        <div class="venta-total" id="venta-total">Total: $0.00</div>
+        <div class="form-actions">
+          <button class="btn btn-primary" onclick="saveVenta()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+            Guardar Venta
+          </button>
+          <button class="btn btn-outline" onclick="this.closest('.form-card').remove()">Cancelar</button>
         </div>
       </div>
-      <div class="venta-items" id="venta-items">
-        <label>Productos</label>
-      </div>
-      <button class="btn btn-outline btn-sm" style="margin-bottom:16px" onclick="addVentaItem()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Agregar producto
-      </button>
-      <div class="venta-total" id="venta-total">Total: $0.00</div>
-      <div class="form-actions">
-        <button class="btn btn-primary" onclick="saveVenta()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
-          Guardar Venta
-        </button>
-        <button class="btn btn-outline" onclick="this.closest('.form-card').remove()">Cancelar</button>
-      </div>
-    </div>
-  `;
-  addVentaItem();
+    `;
+    addVentaItem();
+  } catch (e) { /* api() toasts */ }
 }
 
 function addVentaItem() {
@@ -452,7 +551,7 @@ function addVentaItem() {
     <div>
       <select class="vi-producto" onchange="updateVentaTotal()">
         <option value="">Seleccionar producto...</option>
-        ${productosCache.filter(p => p.activo).map(p => `<option value="${p.id}" data-precio="${p.precio_unitario}">${esc(p.nombre)} — ${formatMoney(p.precio_unitario)}</option>`).join('')}
+        ${productosCache.filter(p => p.activo === 1 || p.activo === true).map(p => `<option value="${p.id}" data-precio="${p.precio_unitario}">${esc(p.nombre)} — ${formatMoney(p.precio_unitario)}</option>`).join('')}
       </select>
     </div>
     <div><input class="vi-cantidad" type="number" min="1" step="1" value="1" placeholder="Cant." onchange="updateVentaTotal()" oninput="updateVentaTotal()"></div>
@@ -484,6 +583,7 @@ async function saveVenta() {
   const cliente_id = parseInt(document.getElementById('vf-cliente').value);
   if (!cliente_id) return toast('Selecciona un cliente', 'error');
 
+  const notas = document.getElementById('vf-notas') ? document.getElementById('vf-notas').value.trim() : '';
   const items = [];
   let valid = true;
   document.querySelectorAll('.venta-item').forEach(row => {
@@ -495,85 +595,93 @@ async function saveVenta() {
 
   if (!valid || !items.length) return toast('Agrega al menos un producto con cantidad válida', 'error');
 
-  await api('/api/ventas', { method: 'POST', body: { cliente_id, items } });
-  toast('Venta registrada', 'success');
-  document.getElementById('venta-form-container').innerHTML = '';
-  loadVentas();
+  try {
+    showLoading();
+    await api('/api/ventas', { method: 'POST', body: { cliente_id, items, notas } });
+    toast('Venta registrada', 'success');
+    document.getElementById('venta-form-container').innerHTML = '';
+    loadVentas();
+  } finally {
+    hideLoading();
+  }
 }
 
 async function verVenta(id) {
-  const v = await api('/api/ventas/' + id);
-  const saldo = v.total - v.pagado;
+  try {
+    const v = await api('/api/ventas/' + id);
+    const saldo = v.total - v.pagado;
 
-  document.getElementById('modal-content').innerHTML = `
-    <h3>Venta #${v.id}</h3>
-    <p style="color:var(--gray-500);margin-bottom:20px;font-size:14px">
-      <strong>${esc(v.cliente_nombre)}</strong> &middot; ${formatDate(v.fecha)}
-    </p>
+    document.getElementById('modal-content').innerHTML = `
+      <h3>Venta #${v.id}</h3>
+      <p style="color:var(--gray-500);margin-bottom:20px;font-size:14px">
+        <strong>${esc(v.cliente_nombre)}</strong> &middot; ${formatDate(v.fecha)}
+        ${v.notas ? `<br><span style="font-style:italic">${esc(v.notas)}</span>` : ''}
+      </p>
 
-    <div class="table-container" style="margin-bottom:16px">
-      <table>
-        <thead><tr><th>Producto</th><th class="text-right">Cant.</th><th class="text-right">P. Unit.</th><th class="text-right">Subtotal</th></tr></thead>
-        <tbody>
-          ${v.detalles.map(d => `
-            <tr>
-              <td><strong>${esc(d.producto_nombre)}</strong></td>
-              <td class="text-right">${d.cantidad}</td>
-              <td class="text-right">${formatMoney(d.precio_unitario)}</td>
-              <td class="text-right"><strong>${formatMoney(d.subtotal)}</strong></td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-
-    <div style="text-align:right;margin:16px 0;font-size:15px;line-height:2">
-      <div><span style="color:var(--gray-500)">Total:</span> <strong style="font-size:18px">${formatMoney(v.total)}</strong></div>
-      <div><span style="color:var(--gray-500)">Pagado:</span> <span style="color:var(--success);font-weight:600">${formatMoney(v.pagado)}</span></div>
-      ${saldo > 0
-        ? `<div><span style="color:var(--gray-500)">Saldo:</span> <span style="color:var(--danger);font-weight:700">${formatMoney(saldo)}</span></div>`
-        : '<div><span class="badge badge-paid"><span class="badge-dot"></span>PAGADA</span></div>'}
-    </div>
-
-    ${v.pagos.length ? `
-      <h4 style="margin:20px 0 12px;font-size:14px;font-weight:700;color:var(--gray-700)">Historial de Pagos</h4>
-      <div class="table-container">
+      <div class="table-container" style="margin-bottom:16px">
         <table>
-          <thead><tr><th>Fecha</th><th class="text-right">Monto</th><th>Método</th></tr></thead>
+          <thead><tr><th>Producto</th><th class="text-right">Cant.</th><th class="text-right">P. Unit.</th><th class="text-right">Subtotal</th></tr></thead>
           <tbody>
-            ${v.pagos.map(p => `
-              <tr><td>${formatDate(p.fecha)}</td><td class="text-right"><strong>${formatMoney(p.monto)}</strong></td><td style="text-transform:capitalize">${p.metodo}</td></tr>
+            ${v.detalles.map(d => `
+              <tr>
+                <td><strong>${esc(d.producto_nombre)}</strong></td>
+                <td class="text-right">${d.cantidad}</td>
+                <td class="text-right">${formatMoney(d.precio_unitario)}</td>
+                <td class="text-right"><strong>${formatMoney(d.subtotal)}</strong></td>
+              </tr>
             `).join('')}
           </tbody>
         </table>
       </div>
-    ` : ''}
 
-    ${saldo > 0 ? `
-      <h4 style="margin:20px 0 12px;font-size:14px;font-weight:700;color:var(--gray-700)">Registrar Pago</h4>
-      <div class="form-row">
-        <div class="form-group"><label>Monto *</label><input id="pago-monto" type="number" step="0.01" min="0.01" max="${saldo.toFixed(2)}" value="${saldo.toFixed(2)}"></div>
-        <div class="form-group">
-          <label>Método</label>
-          <select id="pago-metodo">
-            <option value="efectivo">Efectivo</option>
-            <option value="transferencia">Transferencia</option>
-            <option value="tarjeta">Tarjeta</option>
-            <option value="otro">Otro</option>
-          </select>
-        </div>
+      <div style="text-align:right;margin:16px 0;font-size:15px;line-height:2">
+        <div><span style="color:var(--gray-500)">Total:</span> <strong style="font-size:18px">${formatMoney(v.total)}</strong></div>
+        <div><span style="color:var(--gray-500)">Pagado:</span> <span style="color:var(--success);font-weight:600">${formatMoney(v.pagado)}</span></div>
+        ${saldo > 0.01
+          ? `<div><span style="color:var(--gray-500)">Saldo:</span> <span style="color:var(--danger);font-weight:700">${formatMoney(saldo)}</span></div>`
+          : '<div><span class="badge badge-paid"><span class="badge-dot"></span>PAGADA</span></div>'}
       </div>
-      <button class="btn btn-success" onclick="registrarPago(${v.id})">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        Registrar Pago
-      </button>
-    ` : ''}
 
-    <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal()">Cerrar</button>
-    </div>
-  `;
-  document.getElementById('modal-overlay').style.display = 'flex';
+      ${v.pagos.length ? `
+        <h4 style="margin:20px 0 12px;font-size:14px;font-weight:700;color:var(--gray-700)">Historial de Pagos</h4>
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Fecha</th><th class="text-right">Monto</th><th>Método</th></tr></thead>
+            <tbody>
+              ${v.pagos.map(p => `
+                <tr><td>${formatDate(p.fecha)}</td><td class="text-right"><strong>${formatMoney(p.monto)}</strong></td><td style="text-transform:capitalize">${p.metodo}</td></tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : ''}
+
+      ${saldo > 0.01 ? `
+        <h4 style="margin:20px 0 12px;font-size:14px;font-weight:700;color:var(--gray-700)">Registrar Pago</h4>
+        <div class="form-row">
+          <div class="form-group"><label>Monto *</label><input id="pago-monto" type="number" step="0.01" min="0.01" max="${saldo.toFixed(2)}" value="${saldo.toFixed(2)}"></div>
+          <div class="form-group">
+            <label>Método</label>
+            <select id="pago-metodo">
+              <option value="efectivo">Efectivo</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-success" onclick="registrarPago(${v.id})">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          Registrar Pago
+        </button>
+      ` : ''}
+
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeModal()">Cerrar</button>
+      </div>
+    `;
+    document.getElementById('modal-overlay').style.display = 'flex';
+  } catch (e) { /* api() toasts */ }
 }
 
 async function registrarPago(ventaId) {
@@ -581,17 +689,30 @@ async function registrarPago(ventaId) {
   const metodo = document.getElementById('pago-metodo').value;
   if (!monto || monto <= 0) return toast('Ingresa un monto válido', 'error');
 
-  await api('/api/pagos', { method: 'POST', body: { venta_id: ventaId, monto, metodo } });
-  toast('Pago registrado', 'success');
-  verVenta(ventaId);
-  loadVentas();
+  try {
+    showLoading();
+    await api('/api/pagos', { method: 'POST', body: { venta_id: ventaId, monto, metodo } });
+    toast('Pago registrado', 'success');
+    verVenta(ventaId);
+    loadVentas();
+  } finally {
+    hideLoading();
+  }
 }
 
 async function deleteVenta(id) {
-  if (!confirm('¿Eliminar esta venta y sus pagos?')) return;
-  await api('/api/ventas/' + id, { method: 'DELETE' });
-  toast('Venta eliminada', 'success');
-  loadVentas();
+  const ok = await confirmAction(
+    'Eliminar Venta',
+    '¿Estás seguro de que deseas eliminar esta venta y todos sus pagos asociados? Esta acción no se puede deshacer.'
+  );
+  if (!ok) return;
+  try {
+    showLoading();
+    await api('/api/ventas/' + id, { method: 'DELETE' });
+    toast('Venta eliminada', 'success');
+    loadVentas();
+  } catch (e) { /* api() toasts */ }
+  finally { hideLoading(); }
 }
 
 function closeModal() {
@@ -600,54 +721,56 @@ function closeModal() {
 
 // ============ CARTERA VENCIDA ============
 async function loadCartera() {
-  const data = await api('/api/ventas/reportes/cartera-vencida');
+  try {
+    const data = await api('/api/ventas/reportes/cartera-vencida');
 
-  document.getElementById('cartera-stats').innerHTML = `
-    <div class="stat-card card-warning">
-      <div class="label">Cuentas Pendientes</div>
-      <div class="value warning">${data.cartera.length}</div>
-    </div>
-    <div class="stat-card card-danger">
-      <div class="label">Total por Cobrar</div>
-      <div class="value danger">${formatMoney(data.totalPendiente)}</div>
-    </div>
-    <div class="stat-card card-primary">
-      <div class="label">Promedio por Cuenta</div>
-      <div class="value">${data.cartera.length ? formatMoney(data.totalPendiente / data.cartera.length) : '$0.00'}</div>
-    </div>
-  `;
-
-  const tbody = document.getElementById('cartera-table');
-  tbody.innerHTML = data.cartera.length ? data.cartera.map(r => `
-    <tr>
-      <td><strong>${esc(r.cliente_nombre)}</strong></td>
-      <td>${esc(r.cliente_telefono || '-')}</td>
-      <td>${formatDate(r.fecha)}</td>
-      <td class="text-right">${formatMoney(r.total)}</td>
-      <td class="text-right">${formatMoney(r.pagado)}</td>
-      <td class="text-right" style="color:var(--danger);font-weight:700">${formatMoney(r.saldo_pendiente)}</td>
-      <td>
-        <span class="badge ${r.dias_transcurridos > 30 ? 'badge-overdue' : 'badge-pending'}">
-          <span class="badge-dot"></span>${r.dias_transcurridos} días
-        </span>
-      </td>
-      <td class="text-right">
-        <button class="btn btn-success btn-sm" onclick="navigateTo('ventas');setTimeout(()=>verVenta(${r.venta_id}),300)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          Cobrar
-        </button>
-      </td>
-    </tr>
-  `).join('') : `
-    <tr><td colspan="8">
-      <div class="empty-state">
-        <div class="empty-state-icon" style="background:var(--success-light);color:var(--success)">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
-        </div>
-        <div class="empty-state-title">Todo al día</div>
-        <div class="empty-state-desc">No hay cuentas pendientes de cobro</div>
+    document.getElementById('cartera-stats').innerHTML = `
+      <div class="stat-card card-warning">
+        <div class="label">Cuentas Pendientes</div>
+        <div class="value warning">${data.cartera.length}</div>
       </div>
-    </td></tr>`;
+      <div class="stat-card card-danger">
+        <div class="label">Total por Cobrar</div>
+        <div class="value danger">${formatMoney(data.totalPendiente)}</div>
+      </div>
+      <div class="stat-card card-primary">
+        <div class="label">Promedio por Cuenta</div>
+        <div class="value">${data.cartera.length ? formatMoney(data.totalPendiente / data.cartera.length) : '$0.00'}</div>
+      </div>
+    `;
+
+    const tbody = document.getElementById('cartera-table');
+    tbody.innerHTML = data.cartera.length ? data.cartera.map(r => `
+      <tr data-clickable onclick="verVenta(${r.venta_id})">
+        <td><strong>${esc(r.cliente_nombre)}</strong></td>
+        <td>${esc(r.cliente_telefono || '-')}</td>
+        <td>${formatDate(r.fecha)}</td>
+        <td class="text-right">${formatMoney(r.total)}</td>
+        <td class="text-right">${formatMoney(r.pagado)}</td>
+        <td class="text-right" style="color:var(--danger);font-weight:700">${formatMoney(r.saldo_pendiente)}</td>
+        <td>
+          <span class="badge ${r.dias_transcurridos > 30 ? 'badge-overdue' : 'badge-pending'}">
+            <span class="badge-dot"></span>${r.dias_transcurridos} días
+          </span>
+        </td>
+        <td class="text-right">
+          <button class="btn btn-success btn-sm" onclick="event.stopPropagation();verVenta(${r.venta_id})">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            Cobrar
+          </button>
+        </td>
+      </tr>
+    `).join('') : `
+      <tr><td colspan="8">
+        <div class="empty-state">
+          <div class="empty-state-icon" style="background:var(--success-light);color:var(--success)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+          </div>
+          <div class="empty-state-title">Todo al día</div>
+          <div class="empty-state-desc">No hay cuentas pendientes de cobro</div>
+        </div>
+      </td></tr>`;
+  } catch (e) { /* api() already toasts */ }
 }
 
 // ============ HELPERS ============
