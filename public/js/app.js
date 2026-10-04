@@ -2,11 +2,16 @@ const API = '';
 
 // ============ UTILIDADES ============
 function toast(msg, type = '') {
+  const icon = type === 'success'
+    ? '<svg class="toast-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>'
+    : type === 'error'
+    ? '<svg class="toast-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
+    : '';
   const el = document.createElement('div');
   el.className = 'toast ' + type;
-  el.textContent = msg;
+  el.innerHTML = icon + '<span>' + esc(msg) + '</span>';
   document.body.appendChild(el);
-  setTimeout(() => el.remove(), 3000);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(10px)'; setTimeout(() => el.remove(), 300); }, 3000);
 }
 
 function formatMoney(n) {
@@ -35,34 +40,169 @@ async function api(path, opts = {}) {
 }
 
 // ============ NAVEGACIÓN ============
-function showSection(name) {
+const pageTitles = {
+  dashboard: 'Dashboard',
+  clientes: 'Clientes',
+  productos: 'Productos',
+  ventas: 'Ventas',
+  cartera: 'Cartera Vencida',
+};
+
+function navigateTo(name) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.getElementById('sec-' + name).classList.add('active');
 
-  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  const navItem = document.querySelector(`.nav-item[data-section="${name}"]`);
+  if (navItem) navItem.classList.add('active');
 
+  document.getElementById('page-title').textContent = pageTitles[name] || name;
+
+  // Close mobile sidebar
+  closeSidebar();
+
+  if (name === 'dashboard') loadDashboard();
   if (name === 'clientes') loadClientes();
   if (name === 'productos') loadProductos();
   if (name === 'ventas') loadVentas();
   if (name === 'cartera') loadCartera();
 }
 
+// Sidebar navigation
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', e => {
+    e.preventDefault();
+    navigateTo(item.dataset.section);
+  });
+});
+
+// Mobile sidebar toggle
+const sidebar = document.getElementById('sidebar');
+const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+document.getElementById('menu-toggle').addEventListener('click', () => {
+  sidebar.classList.add('open');
+  sidebarOverlay.classList.add('active');
+});
+
+document.getElementById('sidebar-close').addEventListener('click', closeSidebar);
+sidebarOverlay.addEventListener('click', closeSidebar);
+
+function closeSidebar() {
+  sidebar.classList.remove('open');
+  sidebarOverlay.classList.remove('active');
+}
+
+// ============ DASHBOARD ============
+async function loadDashboard() {
+  try {
+    const [clientes, productos, ventas, cartera] = await Promise.all([
+      api('/api/clientes'),
+      api('/api/productos'),
+      api('/api/ventas'),
+      api('/api/ventas/reportes/cartera-vencida'),
+    ]);
+
+    document.getElementById('dash-clientes').textContent = clientes.length;
+    document.getElementById('dash-productos').textContent = productos.length;
+
+    const totalVentas = ventas.reduce((s, v) => s + v.total, 0);
+    document.getElementById('dash-ventas-total').textContent = formatMoney(totalVentas);
+    document.getElementById('dash-por-cobrar').textContent = formatMoney(cartera.totalPendiente);
+
+    // Update cartera badge
+    const badge = document.getElementById('cartera-badge');
+    if (cartera.cartera.length > 0) {
+      badge.textContent = cartera.cartera.length;
+      badge.style.display = 'block';
+    } else {
+      badge.style.display = 'none';
+    }
+
+    // Recent ventas
+    const recientes = ventas.slice(0, 5);
+    const recentesEl = document.getElementById('dash-ventas-recientes');
+    recentesEl.innerHTML = recientes.length ? recientes.map(v => `
+      <div class="panel-item" style="cursor:pointer" onclick="navigateTo('ventas');setTimeout(()=>verVenta(${v.id}),200)">
+        <div class="panel-item-left">
+          <span class="panel-item-name">${esc(v.cliente_nombre)}</span>
+          <span class="panel-item-sub">${formatDate(v.fecha)}</span>
+        </div>
+        <div class="panel-item-right">
+          <div class="panel-item-amount">${formatMoney(v.total)}</div>
+          <span class="badge ${v.estado === 'pagada' ? 'badge-paid' : 'badge-pending'}" style="font-size:11px;padding:2px 8px">
+            <span class="badge-dot"></span>${v.estado === 'pagada' ? 'Pagada' : 'Pendiente'}
+          </span>
+        </div>
+      </div>
+    `).join('') : '<div class="empty-state-sm">Sin ventas registradas aún</div>';
+
+    // Cartera resumen
+    const carteraResumen = document.getElementById('dash-cartera-resumen');
+    const carteraTop = cartera.cartera.slice(0, 5);
+    carteraResumen.innerHTML = carteraTop.length ? carteraTop.map(r => `
+      <div class="panel-item">
+        <div class="panel-item-left">
+          <span class="panel-item-name">${esc(r.cliente_nombre)}</span>
+          <span class="panel-item-sub">${r.dias_transcurridos} días pendiente</span>
+        </div>
+        <div class="panel-item-right">
+          <div class="panel-item-amount" style="color:var(--danger)">${formatMoney(r.saldo_pendiente)}</div>
+        </div>
+      </div>
+    `).join('') : '<div class="empty-state-sm">Sin cuentas pendientes</div>';
+
+  } catch (e) { /* api() already toasts errors */ }
+}
+
 // ============ CLIENTES ============
+let allClientes = [];
+
 async function loadClientes() {
-  const clientes = await api('/api/clientes');
+  allClientes = await api('/api/clientes');
+  renderClientes(allClientes);
+}
+
+function renderClientes(list) {
   const tbody = document.getElementById('clientes-table');
-  tbody.innerHTML = clientes.length ? clientes.map(c => `
+  tbody.innerHTML = list.length ? list.map(c => `
     <tr>
-      <td><strong>${esc(c.nombre)}</strong></td>
+      <td>
+        <div class="client-name">${esc(c.nombre)}</div>
+        ${c.direccion ? `<div class="client-email">${esc(c.direccion)}</div>` : ''}
+      </td>
       <td>${esc(c.telefono || '-')}</td>
       <td>${esc(c.email || '-')}</td>
-      <td>
-        <button class="btn btn-primary btn-sm" onclick="editCliente(${c.id})">Editar</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteCliente(${c.id})">Eliminar</button>
+      <td class="text-right">
+        <div class="td-actions">
+          <button class="btn-icon" onclick="editCliente(${c.id})" title="Editar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="btn-icon danger" onclick="deleteCliente(${c.id})" title="Eliminar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
       </td>
     </tr>
-  `).join('') : '<tr><td colspan="4" style="text-align:center;color:#999;padding:40px">No hay clientes registrados</td></tr>';
+  `).join('') : `
+    <tr><td colspan="4">
+      <div class="empty-state">
+        <div class="empty-state-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div class="empty-state-title">Sin clientes</div>
+        <div class="empty-state-desc">Agrega tu primer cliente para comenzar</div>
+      </div>
+    </td></tr>`;
+}
+
+function filterClientes(q) {
+  const term = q.toLowerCase();
+  renderClientes(allClientes.filter(c =>
+    c.nombre.toLowerCase().includes(term) ||
+    (c.email || '').toLowerCase().includes(term) ||
+    (c.telefono || '').includes(term)
+  ));
 }
 
 function showClienteForm(cliente = null) {
@@ -71,19 +211,23 @@ function showClienteForm(cliente = null) {
     <div class="form-card">
       <h3>${c.id ? 'Editar' : 'Nuevo'} Cliente</h3>
       <div class="form-row">
-        <div><label>Nombre *</label><input id="cf-nombre" value="${esc(c.nombre || '')}"></div>
-        <div><label>Teléfono</label><input id="cf-telefono" value="${esc(c.telefono || '')}"></div>
+        <div class="form-group"><label>Nombre *</label><input id="cf-nombre" placeholder="Nombre completo" value="${esc(c.nombre || '')}"></div>
+        <div class="form-group"><label>Teléfono</label><input id="cf-telefono" placeholder="(000) 000-0000" value="${esc(c.telefono || '')}"></div>
       </div>
       <div class="form-row">
-        <div><label>Email</label><input id="cf-email" type="email" value="${esc(c.email || '')}"></div>
-        <div><label>Dirección</label><input id="cf-direccion" value="${esc(c.direccion || '')}"></div>
+        <div class="form-group"><label>Email</label><input id="cf-email" type="email" placeholder="correo@ejemplo.com" value="${esc(c.email || '')}"></div>
+        <div class="form-group"><label>Dirección</label><input id="cf-direccion" placeholder="Dirección del cliente" value="${esc(c.direccion || '')}"></div>
       </div>
-      <div style="margin-top:12px">
-        <button class="btn btn-primary" onclick="saveCliente(${c.id || 0})">Guardar</button>
-        <button class="btn" style="background:var(--gray-200)" onclick="this.closest('.form-card').remove()">Cancelar</button>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="saveCliente(${c.id || 0})">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+          Guardar
+        </button>
+        <button class="btn btn-outline" onclick="this.closest('.form-card').remove()">Cancelar</button>
       </div>
     </div>
   `;
+  document.getElementById('cf-nombre').focus();
 }
 
 async function saveCliente(id) {
@@ -118,20 +262,51 @@ async function deleteCliente(id) {
 }
 
 // ============ PRODUCTOS ============
+let allProductos = [];
+
 async function loadProductos() {
-  const productos = await api('/api/productos');
+  allProductos = await api('/api/productos');
+  renderProductos(allProductos);
+}
+
+function renderProductos(list) {
   const tbody = document.getElementById('productos-table');
-  tbody.innerHTML = productos.length ? productos.map(p => `
+  tbody.innerHTML = list.length ? list.map(p => `
     <tr>
-      <td><strong>${esc(p.nombre)}</strong></td>
-      <td>${esc(p.descripcion || '-')}</td>
-      <td>${formatMoney(p.precio_unitario)}</td>
       <td>
-        <button class="btn btn-primary btn-sm" onclick="editProducto(${p.id})">Editar</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteProducto(${p.id})">Eliminar</button>
+        <div class="product-name">${esc(p.nombre)}</div>
+      </td>
+      <td><span class="product-desc">${esc(p.descripcion || '-')}</span></td>
+      <td class="text-right"><strong>${formatMoney(p.precio_unitario)}</strong></td>
+      <td class="text-right">
+        <div class="td-actions">
+          <button class="btn-icon" onclick="editProducto(${p.id})" title="Editar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="btn-icon danger" onclick="deleteProducto(${p.id})" title="Eliminar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
       </td>
     </tr>
-  `).join('') : '<tr><td colspan="4" style="text-align:center;color:#999;padding:40px">No hay productos registrados</td></tr>';
+  `).join('') : `
+    <tr><td colspan="4">
+      <div class="empty-state">
+        <div class="empty-state-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        </div>
+        <div class="empty-state-title">Sin productos</div>
+        <div class="empty-state-desc">Agrega tu primer producto para comenzar</div>
+      </div>
+    </td></tr>`;
+}
+
+function filterProductos(q) {
+  const term = q.toLowerCase();
+  renderProductos(allProductos.filter(p =>
+    p.nombre.toLowerCase().includes(term) ||
+    (p.descripcion || '').toLowerCase().includes(term)
+  ));
 }
 
 function showProductoForm(producto = null) {
@@ -140,18 +315,22 @@ function showProductoForm(producto = null) {
     <div class="form-card">
       <h3>${p.id ? 'Editar' : 'Nuevo'} Producto</h3>
       <div class="form-row">
-        <div><label>Nombre *</label><input id="pf-nombre" value="${esc(p.nombre || '')}"></div>
-        <div><label>Precio Unitario *</label><input id="pf-precio" type="number" step="0.01" min="0" value="${p.precio_unitario || ''}"></div>
+        <div class="form-group"><label>Nombre *</label><input id="pf-nombre" placeholder="Nombre del producto" value="${esc(p.nombre || '')}"></div>
+        <div class="form-group"><label>Precio Unitario *</label><input id="pf-precio" type="number" step="0.01" min="0" placeholder="0.00" value="${p.precio_unitario || ''}"></div>
       </div>
       <div class="form-row">
-        <div><label>Descripción</label><input id="pf-descripcion" value="${esc(p.descripcion || '')}"></div>
+        <div class="form-group"><label>Descripción</label><input id="pf-descripcion" placeholder="Descripción breve" value="${esc(p.descripcion || '')}"></div>
       </div>
-      <div style="margin-top:12px">
-        <button class="btn btn-primary" onclick="saveProducto(${p.id || 0})">Guardar</button>
-        <button class="btn" style="background:var(--gray-200)" onclick="this.closest('.form-card').remove()">Cancelar</button>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="saveProducto(${p.id || 0})">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+          Guardar
+        </button>
+        <button class="btn btn-outline" onclick="this.closest('.form-card').remove()">Cancelar</button>
       </div>
     </div>
   `;
+  document.getElementById('pf-nombre').focus();
 }
 
 async function saveProducto(id) {
@@ -192,18 +371,38 @@ async function loadVentas() {
   const tbody = document.getElementById('ventas-table');
   tbody.innerHTML = ventas.length ? ventas.map(v => `
     <tr>
-      <td>${v.id}</td>
-      <td>${esc(v.cliente_nombre)}</td>
+      <td><span style="color:var(--gray-500);font-weight:500">#${v.id}</span></td>
+      <td><strong>${esc(v.cliente_nombre)}</strong></td>
       <td>${formatDate(v.fecha)}</td>
-      <td>${formatMoney(v.total)}</td>
-      <td>${formatMoney(v.pagado)}</td>
-      <td><span class="badge ${v.estado === 'pagada' ? 'badge-paid' : 'badge-pending'}">${v.estado === 'pagada' ? 'Pagada' : 'Pendiente'}</span></td>
+      <td class="text-right"><strong>${formatMoney(v.total)}</strong></td>
+      <td class="text-right">${formatMoney(v.pagado)}</td>
       <td>
-        <button class="btn btn-primary btn-sm" onclick="verVenta(${v.id})">Ver</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteVenta(${v.id})">Eliminar</button>
+        <span class="badge ${v.estado === 'pagada' ? 'badge-paid' : 'badge-pending'}">
+          <span class="badge-dot"></span>
+          ${v.estado === 'pagada' ? 'Pagada' : 'Pendiente'}
+        </span>
+      </td>
+      <td class="text-right">
+        <div class="td-actions">
+          <button class="btn-icon" onclick="verVenta(${v.id})" title="Ver detalle">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button class="btn-icon danger" onclick="deleteVenta(${v.id})" title="Eliminar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
       </td>
     </tr>
-  `).join('') : '<tr><td colspan="7" style="text-align:center;color:#999;padding:40px">No hay ventas registradas</td></tr>';
+  `).join('') : `
+    <tr><td colspan="7">
+      <div class="empty-state">
+        <div class="empty-state-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        </div>
+        <div class="empty-state-title">Sin ventas</div>
+        <div class="empty-state-desc">Registra tu primera venta para comenzar</div>
+      </div>
+    </td></tr>`;
 }
 
 async function showNuevaVenta() {
@@ -217,10 +416,10 @@ async function showNuevaVenta() {
     <div class="form-card">
       <h3>Nueva Venta</h3>
       <div class="form-row">
-        <div>
+        <div class="form-group">
           <label>Cliente *</label>
           <select id="vf-cliente">
-            <option value="">Seleccionar...</option>
+            <option value="">Seleccionar cliente...</option>
             ${clientes.map(c => `<option value="${c.id}">${esc(c.nombre)}</option>`).join('')}
           </select>
         </div>
@@ -228,11 +427,17 @@ async function showNuevaVenta() {
       <div class="venta-items" id="venta-items">
         <label>Productos</label>
       </div>
-      <button class="btn btn-sm" style="background:var(--gray-200);margin-bottom:12px" onclick="addVentaItem()">+ Agregar producto</button>
+      <button class="btn btn-outline btn-sm" style="margin-bottom:16px" onclick="addVentaItem()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Agregar producto
+      </button>
       <div class="venta-total" id="venta-total">Total: $0.00</div>
-      <div style="margin-top:12px">
-        <button class="btn btn-primary" onclick="saveVenta()">Guardar Venta</button>
-        <button class="btn" style="background:var(--gray-200)" onclick="this.closest('.form-card').remove()">Cancelar</button>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="saveVenta()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+          Guardar Venta
+        </button>
+        <button class="btn btn-outline" onclick="this.closest('.form-card').remove()">Cancelar</button>
       </div>
     </div>
   `;
@@ -246,13 +451,17 @@ function addVentaItem() {
   div.innerHTML = `
     <div>
       <select class="vi-producto" onchange="updateVentaTotal()">
-        <option value="">Producto...</option>
-        ${productosCache.filter(p => p.activo).map(p => `<option value="${p.id}" data-precio="${p.precio_unitario}">${esc(p.nombre)} - ${formatMoney(p.precio_unitario)}</option>`).join('')}
+        <option value="">Seleccionar producto...</option>
+        ${productosCache.filter(p => p.activo).map(p => `<option value="${p.id}" data-precio="${p.precio_unitario}">${esc(p.nombre)} — ${formatMoney(p.precio_unitario)}</option>`).join('')}
       </select>
     </div>
     <div><input class="vi-cantidad" type="number" min="1" step="1" value="1" placeholder="Cant." onchange="updateVentaTotal()" oninput="updateVentaTotal()"></div>
-    <div style="line-height:36px;text-align:right;font-weight:600" class="vi-subtotal">$0.00</div>
-    <div><button class="btn btn-danger btn-sm" onclick="this.closest('.venta-item').remove();updateVentaTotal()">✕</button></div>
+    <div style="line-height:38px;text-align:right;font-weight:600;color:var(--gray-700)" class="vi-subtotal">$0.00</div>
+    <div>
+      <button class="btn-icon danger" onclick="this.closest('.venta-item').remove();updateVentaTotal()" title="Quitar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
   `;
   container.appendChild(div);
 }
@@ -297,46 +506,54 @@ async function verVenta(id) {
   const saldo = v.total - v.pagado;
 
   document.getElementById('modal-content').innerHTML = `
-    <h3>Venta #${v.id} — ${esc(v.cliente_nombre)}</h3>
-    <p style="color:var(--gray-500);margin-bottom:16px">${formatDate(v.fecha)}</p>
+    <h3>Venta #${v.id}</h3>
+    <p style="color:var(--gray-500);margin-bottom:20px;font-size:14px">
+      <strong>${esc(v.cliente_nombre)}</strong> &middot; ${formatDate(v.fecha)}
+    </p>
 
-    <table>
-      <thead><tr><th>Producto</th><th>Cant.</th><th>P. Unit.</th><th>Subtotal</th></tr></thead>
-      <tbody>
-        ${v.detalles.map(d => `
-          <tr>
-            <td>${esc(d.producto_nombre)}</td>
-            <td>${d.cantidad}</td>
-            <td>${formatMoney(d.precio_unitario)}</td>
-            <td>${formatMoney(d.subtotal)}</td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
-
-    <div style="text-align:right;margin:12px 0;font-size:18px">
-      <strong>Total: ${formatMoney(v.total)}</strong><br>
-      <span style="color:var(--success)">Pagado: ${formatMoney(v.pagado)}</span><br>
-      ${saldo > 0 ? `<span style="color:var(--danger)">Saldo: ${formatMoney(saldo)}</span>` : '<span class="badge badge-paid">PAGADA</span>'}
-    </div>
-
-    ${v.pagos.length ? `
-      <h4 style="margin:16px 0 8px">Historial de Pagos</h4>
+    <div class="table-container" style="margin-bottom:16px">
       <table>
-        <thead><tr><th>Fecha</th><th>Monto</th><th>Método</th></tr></thead>
+        <thead><tr><th>Producto</th><th class="text-right">Cant.</th><th class="text-right">P. Unit.</th><th class="text-right">Subtotal</th></tr></thead>
         <tbody>
-          ${v.pagos.map(p => `
-            <tr><td>${formatDate(p.fecha)}</td><td>${formatMoney(p.monto)}</td><td>${p.metodo}</td></tr>
+          ${v.detalles.map(d => `
+            <tr>
+              <td><strong>${esc(d.producto_nombre)}</strong></td>
+              <td class="text-right">${d.cantidad}</td>
+              <td class="text-right">${formatMoney(d.precio_unitario)}</td>
+              <td class="text-right"><strong>${formatMoney(d.subtotal)}</strong></td>
+            </tr>
           `).join('')}
         </tbody>
       </table>
+    </div>
+
+    <div style="text-align:right;margin:16px 0;font-size:15px;line-height:2">
+      <div><span style="color:var(--gray-500)">Total:</span> <strong style="font-size:18px">${formatMoney(v.total)}</strong></div>
+      <div><span style="color:var(--gray-500)">Pagado:</span> <span style="color:var(--success);font-weight:600">${formatMoney(v.pagado)}</span></div>
+      ${saldo > 0
+        ? `<div><span style="color:var(--gray-500)">Saldo:</span> <span style="color:var(--danger);font-weight:700">${formatMoney(saldo)}</span></div>`
+        : '<div><span class="badge badge-paid"><span class="badge-dot"></span>PAGADA</span></div>'}
+    </div>
+
+    ${v.pagos.length ? `
+      <h4 style="margin:20px 0 12px;font-size:14px;font-weight:700;color:var(--gray-700)">Historial de Pagos</h4>
+      <div class="table-container">
+        <table>
+          <thead><tr><th>Fecha</th><th class="text-right">Monto</th><th>Método</th></tr></thead>
+          <tbody>
+            ${v.pagos.map(p => `
+              <tr><td>${formatDate(p.fecha)}</td><td class="text-right"><strong>${formatMoney(p.monto)}</strong></td><td style="text-transform:capitalize">${p.metodo}</td></tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
     ` : ''}
 
     ${saldo > 0 ? `
-      <h4 style="margin:16px 0 8px">Registrar Pago</h4>
+      <h4 style="margin:20px 0 12px;font-size:14px;font-weight:700;color:var(--gray-700)">Registrar Pago</h4>
       <div class="form-row">
-        <div><label>Monto *</label><input id="pago-monto" type="number" step="0.01" min="0.01" max="${saldo.toFixed(2)}" value="${saldo.toFixed(2)}"></div>
-        <div>
+        <div class="form-group"><label>Monto *</label><input id="pago-monto" type="number" step="0.01" min="0.01" max="${saldo.toFixed(2)}" value="${saldo.toFixed(2)}"></div>
+        <div class="form-group">
           <label>Método</label>
           <select id="pago-metodo">
             <option value="efectivo">Efectivo</option>
@@ -346,11 +563,14 @@ async function verVenta(id) {
           </select>
         </div>
       </div>
-      <button class="btn btn-success" onclick="registrarPago(${v.id})">Registrar Pago</button>
+      <button class="btn btn-success" onclick="registrarPago(${v.id})">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Registrar Pago
+      </button>
     ` : ''}
 
     <div class="modal-actions">
-      <button class="btn" style="background:var(--gray-200)" onclick="closeModal()">Cerrar</button>
+      <button class="btn btn-outline" onclick="closeModal()">Cerrar</button>
     </div>
   `;
   document.getElementById('modal-overlay').style.display = 'flex';
@@ -363,8 +583,8 @@ async function registrarPago(ventaId) {
 
   await api('/api/pagos', { method: 'POST', body: { venta_id: ventaId, monto, metodo } });
   toast('Pago registrado', 'success');
-  verVenta(ventaId); // recargar modal
-  loadVentas(); // actualizar tabla de fondo
+  verVenta(ventaId);
+  loadVentas();
 }
 
 async function deleteVenta(id) {
@@ -383,13 +603,17 @@ async function loadCartera() {
   const data = await api('/api/ventas/reportes/cartera-vencida');
 
   document.getElementById('cartera-stats').innerHTML = `
-    <div class="stat-card">
-      <div class="label">Cuentas pendientes</div>
-      <div class="value">${data.cartera.length}</div>
+    <div class="stat-card card-warning">
+      <div class="label">Cuentas Pendientes</div>
+      <div class="value warning">${data.cartera.length}</div>
     </div>
-    <div class="stat-card">
-      <div class="label">Total por cobrar</div>
+    <div class="stat-card card-danger">
+      <div class="label">Total por Cobrar</div>
       <div class="value danger">${formatMoney(data.totalPendiente)}</div>
+    </div>
+    <div class="stat-card card-primary">
+      <div class="label">Promedio por Cuenta</div>
+      <div class="value">${data.cartera.length ? formatMoney(data.totalPendiente / data.cartera.length) : '$0.00'}</div>
     </div>
   `;
 
@@ -399,13 +623,31 @@ async function loadCartera() {
       <td><strong>${esc(r.cliente_nombre)}</strong></td>
       <td>${esc(r.cliente_telefono || '-')}</td>
       <td>${formatDate(r.fecha)}</td>
-      <td>${formatMoney(r.total)}</td>
-      <td>${formatMoney(r.pagado)}</td>
-      <td style="color:var(--danger);font-weight:600">${formatMoney(r.saldo_pendiente)}</td>
-      <td><span class="badge ${r.dias_transcurridos > 30 ? 'badge-overdue' : 'badge-pending'}">${r.dias_transcurridos} días</span></td>
-      <td><button class="btn btn-success btn-sm" onclick="showSection('ventas');setTimeout(()=>verVenta(${r.venta_id}),300)">Pagar</button></td>
+      <td class="text-right">${formatMoney(r.total)}</td>
+      <td class="text-right">${formatMoney(r.pagado)}</td>
+      <td class="text-right" style="color:var(--danger);font-weight:700">${formatMoney(r.saldo_pendiente)}</td>
+      <td>
+        <span class="badge ${r.dias_transcurridos > 30 ? 'badge-overdue' : 'badge-pending'}">
+          <span class="badge-dot"></span>${r.dias_transcurridos} días
+        </span>
+      </td>
+      <td class="text-right">
+        <button class="btn btn-success btn-sm" onclick="navigateTo('ventas');setTimeout(()=>verVenta(${r.venta_id}),300)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          Cobrar
+        </button>
+      </td>
     </tr>
-  `).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--success);padding:40px">✓ No hay cuentas pendientes</td></tr>';
+  `).join('') : `
+    <tr><td colspan="8">
+      <div class="empty-state">
+        <div class="empty-state-icon" style="background:var(--success-light);color:var(--success)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+        <div class="empty-state-title">Todo al día</div>
+        <div class="empty-state-desc">No hay cuentas pendientes de cobro</div>
+      </div>
+    </td></tr>`;
 }
 
 // ============ HELPERS ============
@@ -416,5 +658,19 @@ function esc(str) {
   return d.innerHTML;
 }
 
-// Cargar clientes al inicio
-loadClientes();
+// Set date in topbar
+function updateTopbarDate() {
+  const now = new Date();
+  const opts = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+  const dateStr = now.toLocaleDateString('es-MX', opts);
+  document.getElementById('topbar-date').textContent = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+}
+
+// Keyboard shortcut: ESC to close modal
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+
+// Init
+updateTopbarDate();
+loadDashboard();
