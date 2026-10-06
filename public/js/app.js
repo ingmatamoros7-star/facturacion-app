@@ -103,6 +103,8 @@ function renderUser() {
   const initials = currentUser.nombre.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
   document.getElementById('user-avatar').textContent = initials || 'U';
   document.getElementById('user-name').textContent = currentUser.nombre;
+  const n2 = document.getElementById('user-name2');
+  if (n2) n2.textContent = currentUser.nombre;
   document.getElementById('user-role').textContent = currentUser.rol === 'admin' ? 'Administrador' : 'Usuario';
 }
 
@@ -177,15 +179,24 @@ const pageTitles = {
   clientes: 'Clientes', productos: 'Productos', reportes: 'Reportes',
 };
 
+// Submódulos agrupados en el menú "Cobranza"
+const COBRANZA_SUBS = ['cobros', 'cuentas', 'cartera'];
+
 function navigateTo(name) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   const sec = document.getElementById('sec-' + name);
   if (sec) sec.classList.add('active');
+
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   const navItem = document.querySelector(`.nav-item[data-section="${name}"]`);
   if (navItem) navItem.classList.add('active');
+  // Resaltar el menú padre "Cobranza" si el submódulo está activo
+  const cobranzaTrigger = document.querySelector('.menu-trigger[data-menu="cobranza"]');
+  if (cobranzaTrigger) cobranzaTrigger.classList.toggle('active', COBRANZA_SUBS.includes(name));
+
   document.getElementById('page-title').textContent = pageTitles[name] || name;
-  closeSidebar();
+  closeMobileMenu();
+  closeAllDropdowns();
 
   if (name === 'dashboard') loadDashboard();
   if (name === 'ventas') loadVentas();
@@ -197,18 +208,40 @@ function navigateTo(name) {
   if (name === 'reportes') loadReportes();
 }
 
-document.querySelectorAll('.nav-item').forEach(item => {
+// Navegación: solo los enlaces con data-section navegan
+document.querySelectorAll('.nav-item[data-section]').forEach(item => {
   item.addEventListener('click', e => { e.preventDefault(); navigateTo(item.dataset.section); });
 });
 
-const sidebar = document.getElementById('sidebar');
-const sidebarOverlay = document.getElementById('sidebar-overlay');
-document.getElementById('menu-toggle').addEventListener('click', () => {
-  sidebar.classList.add('open'); sidebarOverlay.classList.add('active');
+// Menús desplegables (Cobranza, Usuario)
+function closeAllDropdowns() {
+  document.querySelectorAll('.menu-dropdown.open').forEach(d => d.classList.remove('open'));
+}
+document.querySelectorAll('.menu-trigger').forEach(trigger => {
+  trigger.addEventListener('click', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    const parent = trigger.closest('.menu-dropdown');
+    const wasOpen = parent.classList.contains('open');
+    closeAllDropdowns();
+    if (!wasOpen) parent.classList.add('open');
+  });
 });
-document.getElementById('sidebar-close').addEventListener('click', closeSidebar);
-sidebarOverlay.addEventListener('click', closeSidebar);
-function closeSidebar() { sidebar.classList.remove('open'); sidebarOverlay.classList.remove('active'); }
+document.addEventListener('click', () => closeAllDropdowns());
+
+// Menú móvil
+const mainmenu = document.getElementById('mainmenu');
+const menuOverlay = document.getElementById('menu-overlay');
+document.getElementById('menu-toggle').addEventListener('click', e => {
+  e.stopPropagation();
+  const open = mainmenu.classList.toggle('open');
+  menuOverlay.classList.toggle('active', open);
+});
+menuOverlay.addEventListener('click', closeMobileMenu);
+function closeMobileMenu() {
+  mainmenu.classList.remove('open');
+  menuOverlay.classList.remove('active');
+}
 
 // ============ CONFIRM DIALOG ============
 function confirmAction(title, message, btnText = 'Eliminar') {
