@@ -3,19 +3,46 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistema de Facturación</title>
+  <title>Sistema de Ventas y Cobranzas</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
 
+<!-- ============ LOGIN ============ -->
+<div id="login-screen" class="login-screen" style="display:none">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-icon">V</div>
+      <span class="logo-text">VentasPro</span>
+    </div>
+    <h1 class="login-title">Iniciar sesión</h1>
+    <p class="login-subtitle">Sistema de ventas y cuentas por cobrar</p>
+    <form id="login-form" autocomplete="on">
+      <div class="form-group">
+        <label>Correo electrónico</label>
+        <input id="login-email" type="email" placeholder="correo@ejemplo.com" autocomplete="username" required>
+      </div>
+      <div class="form-group">
+        <label>Contraseña</label>
+        <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password" required>
+      </div>
+      <div id="login-error" class="login-error" style="display:none"></div>
+      <button type="submit" class="btn btn-primary login-btn">Entrar</button>
+    </form>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app" style="display:none">
+
 <!-- SIDEBAR -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-header">
     <div class="sidebar-logo">
-      <div class="logo-icon">F</div>
-      <span class="logo-text">FacturaPro</span>
+      <div class="logo-icon">V</div>
+      <span class="logo-text">VentasPro</span>
     </div>
     <button class="sidebar-close" id="sidebar-close" aria-label="Cerrar menú">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -24,7 +51,25 @@
   <nav class="sidebar-nav">
     <a href="#" class="nav-item active" data-section="dashboard">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-      <span>Dashboard</span>
+      <span>Inicio</span>
+    </a>
+    <a href="#" class="nav-item" data-section="ventas">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      <span>Ventas</span>
+    </a>
+    <a href="#" class="nav-item" data-section="cobros">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      <span>¿A quién cobrar?</span>
+      <span class="nav-badge" id="cobros-badge" style="display:none">0</span>
+    </a>
+    <a href="#" class="nav-item" data-section="cuentas">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      <span>Cuentas por cobrar</span>
+    </a>
+    <a href="#" class="nav-item" data-section="cartera">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>Cartera vencida</span>
+      <span class="nav-badge" id="cartera-badge" style="display:none">0</span>
     </a>
     <a href="#" class="nav-item" data-section="clientes">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -34,41 +79,42 @@
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
       <span>Productos</span>
     </a>
-    <a href="#" class="nav-item" data-section="ventas">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-      <span>Ventas</span>
-    </a>
-    <a href="#" class="nav-item" data-section="cartera">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      <span>Cartera Vencida</span>
-      <span class="nav-badge" id="cartera-badge" style="display:none">0</span>
+    <a href="#" class="nav-item" data-section="reportes">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+      <span>Reportes</span>
     </a>
   </nav>
   <div class="sidebar-footer">
-    <div class="sidebar-user">
-      <div class="user-avatar">CM</div>
+    <div class="sidebar-user" id="sidebar-user" onclick="showCuenta()" title="Mi cuenta" style="cursor:pointer">
+      <div class="user-avatar" id="user-avatar">U</div>
       <div class="user-info">
-        <span class="user-name">Administrador</span>
-        <span class="user-role">Sistema de Facturación</span>
+        <span class="user-name" id="user-name">Usuario</span>
+        <span class="user-role" id="user-role">—</span>
       </div>
     </div>
+    <button class="logout-btn" id="logout-btn" title="Cerrar sesión">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Cerrar sesión
+    </button>
   </div>
 </aside>
 
-<!-- OVERLAY for mobile sidebar -->
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
 <!-- MAIN -->
 <main class="main-content">
-  <!-- TOP BAR -->
   <header class="topbar">
     <div class="topbar-left">
       <button class="menu-toggle" id="menu-toggle" aria-label="Abrir menú">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
-      <h1 class="page-title" id="page-title">Dashboard</h1>
+      <h1 class="page-title" id="page-title">Inicio</h1>
     </div>
     <div class="topbar-right">
+      <button class="btn btn-primary btn-sm" onclick="navigateTo('ventas');setTimeout(showNuevaVenta,150)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nueva venta
+      </button>
       <span class="topbar-date" id="topbar-date"></span>
     </div>
   </header>
@@ -77,118 +123,22 @@
 
     <!-- DASHBOARD -->
     <div id="sec-dashboard" class="section active">
-      <div class="dashboard-grid">
-        <div class="metric-card">
-          <div class="metric-icon" style="background:rgba(37,99,235,.1);color:#2563eb">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          </div>
-          <div class="metric-info">
-            <span class="metric-label">Total Clientes</span>
-            <span class="metric-value" id="dash-clientes">0</span>
-          </div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-icon" style="background:rgba(124,58,237,.1);color:#7c3aed">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-          </div>
-          <div class="metric-info">
-            <span class="metric-label">Productos</span>
-            <span class="metric-value" id="dash-productos">0</span>
-          </div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-icon" style="background:rgba(22,163,74,.1);color:#16a34a">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          </div>
-          <div class="metric-info">
-            <span class="metric-label">Ventas Totales</span>
-            <span class="metric-value" id="dash-ventas-total">$0</span>
-          </div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-icon" style="background:rgba(220,38,38,.1);color:#dc2626">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          </div>
-          <div class="metric-info">
-            <span class="metric-label">Por Cobrar</span>
-            <span class="metric-value" id="dash-por-cobrar">$0</span>
-          </div>
-        </div>
-      </div>
-
+      <div class="dashboard-grid" id="dash-metrics"></div>
       <div class="dashboard-panels">
         <div class="panel">
           <div class="panel-header">
-            <h3>Ventas Recientes</h3>
+            <h3>Ventas recientes</h3>
             <button class="btn btn-ghost btn-sm" onclick="navigateTo('ventas')">Ver todas</button>
           </div>
-          <div class="panel-body" id="dash-ventas-recientes">
-            <div class="empty-state-sm">Sin ventas aún</div>
-          </div>
+          <div class="panel-body" id="dash-ventas-recientes"><div class="empty-state-sm">Sin ventas aún</div></div>
         </div>
         <div class="panel">
           <div class="panel-header">
-            <h3>Cuentas por Cobrar</h3>
-            <button class="btn btn-ghost btn-sm" onclick="navigateTo('cartera')">Ver todas</button>
+            <h3>Clientes a cobrar</h3>
+            <button class="btn btn-ghost btn-sm" onclick="navigateTo('cobros')">Ver todos</button>
           </div>
-          <div class="panel-body" id="dash-cartera-resumen">
-            <div class="empty-state-sm">Sin cuentas pendientes</div>
-          </div>
+          <div class="panel-body" id="dash-seguimiento"><div class="empty-state-sm">Sin cuentas pendientes</div></div>
         </div>
-      </div>
-    </div>
-
-    <!-- CLIENTES -->
-    <div id="sec-clientes" class="section">
-      <div class="section-header">
-        <div>
-          <h2>Clientes</h2>
-          <p class="section-subtitle">Gestiona tu cartera de clientes</p>
-        </div>
-        <button class="btn btn-primary" onclick="showClienteForm()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Nuevo Cliente
-        </button>
-      </div>
-      <div id="cliente-form-container"></div>
-      <div class="search-bar">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="search-clientes" placeholder="Buscar clientes..." oninput="filterClientes(this.value)">
-      </div>
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr><th>Cliente</th><th>Teléfono</th><th>Email</th><th class="text-right">Acciones</th></tr>
-          </thead>
-          <tbody id="clientes-table"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- PRODUCTOS -->
-    <div id="sec-productos" class="section">
-      <div class="section-header">
-        <div>
-          <h2>Productos</h2>
-          <p class="section-subtitle">Catálogo de productos y servicios</p>
-        </div>
-        <button class="btn btn-primary" onclick="showProductoForm()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Nuevo Producto
-        </button>
-      </div>
-      <div id="producto-form-container"></div>
-      <div class="search-bar">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="search-productos" placeholder="Buscar productos..." oninput="filterProductos(this.value)">
-      </div>
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr><th>Producto</th><th>Descripción</th><th class="text-right">Precio Unitario</th><th class="text-right">Acciones</th></tr>
-          </thead>
-          <tbody id="productos-table"></tbody>
-        </table>
       </div>
     </div>
 
@@ -201,20 +151,56 @@
         </div>
         <button class="btn btn-primary" onclick="showNuevaVenta()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Nueva Venta
+          Nueva venta
         </button>
       </div>
       <div id="venta-form-container"></div>
       <div class="search-bar">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="search-ventas" placeholder="Buscar por cliente, estado o # de venta..." oninput="filterVentas(this.value)">
+        <input type="text" id="search-ventas" placeholder="Buscar por cliente, # de venta o estado..." oninput="filterVentas(this.value)">
       </div>
       <div class="table-container">
         <table>
           <thead>
-            <tr><th>#</th><th>Cliente</th><th>Fecha</th><th class="text-right">Total</th><th class="text-right">Pagado</th><th>Estado</th><th class="text-right">Acciones</th></tr>
+            <tr><th># Venta</th><th>Cliente</th><th>Fecha</th><th class="text-right">Total</th><th class="text-right">Pagado</th><th class="text-right">Saldo</th><th>Estado</th><th class="text-right">Acciones</th></tr>
           </thead>
           <tbody id="ventas-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- COBROS (A QUIÉN COBRAR) -->
+    <div id="sec-cobros" class="section">
+      <div class="section-header">
+        <div>
+          <h2>¿A quién tengo que cobrar?</h2>
+          <p class="section-subtitle">Clientes con pagos pendientes</p>
+        </div>
+      </div>
+      <div class="filter-chips" id="cobros-filtros">
+        <button class="chip active" data-filtro="todos" onclick="setCobrosFiltro('todos')">Todos</button>
+        <button class="chip" data-filtro="vencidos" onclick="setCobrosFiltro('vencidos')">Vencidos</button>
+        <button class="chip" data-filtro="hoy" onclick="setCobrosFiltro('hoy')">Vencen hoy</button>
+        <button class="chip" data-filtro="proximos" onclick="setCobrosFiltro('proximos')">Próximos a vencer</button>
+      </div>
+      <div id="cobros-list" class="cobros-list"></div>
+    </div>
+
+    <!-- CUENTAS POR COBRAR -->
+    <div id="sec-cuentas" class="section">
+      <div class="section-header">
+        <div>
+          <h2>Cuentas por cobrar</h2>
+          <p class="section-subtitle">Todas las ventas con saldo pendiente</p>
+        </div>
+      </div>
+      <div class="stat-cards" id="cuentas-stats"></div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr><th>Cliente</th><th># Venta</th><th>Fecha</th><th>Vencimiento</th><th class="text-right">Total</th><th class="text-right">Pagado</th><th class="text-right">Saldo</th><th>Días</th><th>Estado</th><th class="text-right">Acción</th></tr>
+          </thead>
+          <tbody id="cuentas-table"></tbody>
         </table>
       </div>
     </div>
@@ -223,18 +209,136 @@
     <div id="sec-cartera" class="section">
       <div class="section-header">
         <div>
-          <h2>Cartera Vencida</h2>
-          <p class="section-subtitle">Cuentas pendientes de cobro</p>
+          <h2>Cartera vencida</h2>
+          <p class="section-subtitle">Cuentas vencidas con saldo pendiente</p>
         </div>
       </div>
       <div class="stat-cards" id="cartera-stats"></div>
       <div class="table-container">
         <table>
           <thead>
-            <tr><th>Cliente</th><th>Teléfono</th><th>Fecha Venta</th><th class="text-right">Total</th><th class="text-right">Pagado</th><th class="text-right">Saldo</th><th>Días</th><th class="text-right">Acción</th></tr>
+            <tr><th>Cliente</th><th>Teléfono</th><th>Fecha venta</th><th>Vencimiento</th><th class="text-right">Original</th><th class="text-right">Pagado</th><th class="text-right">Saldo</th><th>Días vencidos</th><th class="text-right">Acción</th></tr>
           </thead>
           <tbody id="cartera-table"></tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- CLIENTES -->
+    <div id="sec-clientes" class="section">
+      <div class="section-header">
+        <div>
+          <h2>Clientes</h2>
+          <p class="section-subtitle">Administra tu cartera de clientes</p>
+        </div>
+        <button class="btn btn-primary" onclick="showClienteForm()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nuevo cliente
+        </button>
+      </div>
+      <div id="cliente-form-container"></div>
+      <div class="search-bar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="search-clientes" placeholder="Buscar por nombre, cédula/RUC o teléfono..." oninput="filterClientes(this.value)">
+      </div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr><th>Cliente</th><th>Cédula / RUC</th><th>Teléfono</th><th class="text-right">Saldo pendiente</th><th>Estado</th><th class="text-right">Acciones</th></tr>
+          </thead>
+          <tbody id="clientes-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PRODUCTOS -->
+    <div id="sec-productos" class="section">
+      <div class="section-header">
+        <div>
+          <h2>Productos / Servicios</h2>
+          <p class="section-subtitle">Catálogo de productos y servicios</p>
+        </div>
+        <button class="btn btn-primary" onclick="showProductoForm()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nuevo producto
+        </button>
+      </div>
+      <div id="producto-form-container"></div>
+      <div class="search-bar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="search-productos" placeholder="Buscar por código o nombre..." oninput="filterProductos(this.value)">
+      </div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr><th>Código</th><th>Producto / Servicio</th><th>Descripción</th><th class="text-right">Precio</th><th>Estado</th><th class="text-right">Acciones</th></tr>
+          </thead>
+          <tbody id="productos-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- REPORTES -->
+    <div id="sec-reportes" class="section">
+      <div class="section-header">
+        <div>
+          <h2>Reportes</h2>
+          <p class="section-subtitle">Ventas y cartera · exporta a Excel o PDF</p>
+        </div>
+      </div>
+      <div class="report-tabs">
+        <button class="report-tab active" data-rep="ventas" onclick="setReporte('ventas')">Reporte de ventas</button>
+        <button class="report-tab" data-rep="cartera" onclick="setReporte('cartera')">Reporte de cartera</button>
+      </div>
+
+      <!-- Reporte ventas -->
+      <div id="rep-ventas">
+        <div class="form-card">
+          <div class="form-row">
+            <div class="form-group"><label>Desde</label><input id="rv-desde" type="date"></div>
+            <div class="form-group"><label>Hasta</label><input id="rv-hasta" type="date"></div>
+            <div class="form-group"><label>Cliente</label><select id="rv-cliente"><option value="">Todos</option></select></div>
+            <div class="form-group"><label>Estado</label>
+              <select id="rv-estado">
+                <option value="">Todos</option>
+                <option value="pagado">Pagado</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="parcial">Pago parcial</option>
+                <option value="vencido">Vencido</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" onclick="runReporteVentas()">Generar</button>
+            <button class="btn btn-outline" onclick="exportReporteVentasCSV()">Exportar Excel (CSV)</button>
+            <button class="btn btn-outline" onclick="imprimirReporte('rep-ventas-print','Reporte de ventas')">Imprimir / PDF</button>
+          </div>
+        </div>
+        <div class="stat-cards" id="rv-resumen"></div>
+        <div class="table-container" id="rep-ventas-print">
+          <table>
+            <thead><tr><th># Venta</th><th>Fecha</th><th>Cliente</th><th class="text-right">Total</th><th class="text-right">Pagado</th><th class="text-right">Saldo</th><th>Estado</th></tr></thead>
+            <tbody id="rv-table"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Reporte cartera -->
+      <div id="rep-cartera" style="display:none">
+        <div class="form-card">
+          <div class="form-actions">
+            <button class="btn btn-primary" onclick="runReporteCartera()">Actualizar</button>
+            <button class="btn btn-outline" onclick="exportReporteCarteraCSV()">Exportar Excel (CSV)</button>
+            <button class="btn btn-outline" onclick="imprimirReporte('rep-cartera-print','Reporte de cartera')">Imprimir / PDF</button>
+          </div>
+        </div>
+        <div class="stat-cards" id="rc-resumen"></div>
+        <div class="table-container" id="rep-cartera-print">
+          <table>
+            <thead><tr><th>Cliente</th><th>Teléfono</th><th class="text-right">Cuentas</th><th class="text-right">Total adeudado</th><th class="text-right">Total vencido</th><th>Días máx.</th></tr></thead>
+            <tbody id="rc-table"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -265,6 +369,8 @@
 <div id="loading-overlay" class="loading-overlay" style="display:none">
   <div class="loading-spinner"></div>
 </div>
+
+</div><!-- /#app -->
 
 <script src="/js/app.js"></script>
 </body>

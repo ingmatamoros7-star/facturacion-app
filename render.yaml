@@ -10,6 +10,8 @@ services:
         value: production
       - key: DB_PATH
         value: /opt/render/project/data
+      - key: JWT_SECRET
+        generateValue: true
     disk:
       name: facturacion-data
       mountPath: /opt/render/project/data

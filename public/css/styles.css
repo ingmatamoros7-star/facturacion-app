@@ -663,14 +663,44 @@ textarea { resize: vertical; min-height: 60px; }
 .stat-card .value.success { color: var(--success); }
 
 /* ============ VENTA ITEMS ============ */
-.venta-items { margin: 16px 0; }
+.venta-items { margin: 8px 0 12px; }
 
 .venta-item {
   display: grid;
-  grid-template-columns: 1fr 100px 100px 40px;
+  grid-template-columns: 1fr 90px 110px 110px 36px;
   gap: 10px;
-  align-items: end;
+  align-items: center;
   margin-bottom: 10px;
+}
+.venta-item .vi-subtotal {
+  text-align: right;
+  font-weight: 600;
+  color: var(--gray-700);
+  font-size: 14px;
+}
+
+.venta-totales {
+  margin-top: 8px;
+  padding: 16px;
+  background: var(--gray-50);
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+}
+.venta-totales > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  color: var(--gray-600);
+  padding: 4px 0;
+}
+.venta-totales .venta-total-final {
+  border-top: 2px solid var(--gray-200);
+  margin-top: 6px;
+  padding-top: 12px;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--gray-900);
 }
 
 .venta-total {
@@ -894,4 +924,167 @@ tr[data-clickable]:hover td { background: var(--primary-50); }
   .dashboard-grid { grid-template-columns: 1fr; }
   .stat-cards { grid-template-columns: 1fr; }
   .topbar-date { display: none; }
+}
+
+/* ============================================
+   AMPLIACIÓN: login, auth, cobros, reportes
+   ============================================ */
+
+/* ---- Login ---- */
+.login-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  padding: 20px;
+  z-index: 600;
+}
+.login-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  padding: 36px 32px;
+  width: 100%;
+  max-width: 400px;
+  animation: modalSlideUp .35s cubic-bezier(.4,0,.2,1);
+}
+.login-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.login-title { font-size: 22px; font-weight: 800; letter-spacing: -0.4px; }
+.login-subtitle { font-size: 14px; color: var(--gray-500); margin: 4px 0 24px; }
+.login-card .form-group { margin-bottom: 16px; }
+.login-btn { width: 100%; justify-content: center; margin-top: 6px; padding: 12px; font-size: 15px; }
+.login-error {
+  background: var(--danger-light);
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+/* ---- Logout button ---- */
+.logout-btn {
+  margin-top: 12px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px;
+  background: rgba(255,255,255,.06);
+  color: var(--gray-400);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.logout-btn:hover { background: rgba(239,68,68,.15); color: #fca5a5; border-color: rgba(239,68,68,.3); }
+
+/* ---- Badges extra ---- */
+.badge-partial { background: #eff6ff; color: #1e40af; }
+.badge-partial .badge-dot { background: #3b82f6; }
+.badge-off { background: var(--gray-100); color: var(--gray-500); }
+.badge-off .badge-dot { background: var(--gray-400); }
+
+/* ---- Botón WhatsApp ---- */
+.btn-wa { background: #25d366; color: white; }
+.btn-wa:hover { background: #1ebe5a; color: white; }
+
+/* ---- Filtros (chips) ---- */
+.filter-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+.chip {
+  padding: 7px 16px;
+  border-radius: 50px;
+  border: 1px solid var(--gray-300);
+  background: white;
+  color: var(--gray-600);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.chip:hover { border-color: var(--primary); color: var(--primary); }
+.chip.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+/* ---- Cobros ---- */
+.cobros-total {
+  font-size: 14px;
+  color: var(--gray-600);
+  margin-bottom: 14px;
+}
+.cobros-total strong { color: var(--gray-900); }
+.cobros-list { display: flex; flex-direction: column; gap: 10px; }
+.cobro-card {
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-left: 4px solid var(--gray-300);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.cobro-vencido { border-left-color: var(--danger); }
+.cobro-hoy { border-left-color: #f97316; }
+.cobro-proximo { border-left-color: var(--warning); }
+.cobro-pendiente { border-left-color: var(--primary); }
+.cobro-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 220px;
+  cursor: pointer;
+}
+.cobro-dot { font-size: 14px; }
+.cobro-info { display: flex; flex-direction: column; gap: 2px; }
+.cobro-name { font-weight: 700; color: var(--gray-900); font-size: 15px; }
+.cobro-sub { font-size: 13px; color: var(--gray-500); }
+.cobro-amount { font-size: 18px; font-weight: 800; color: var(--gray-900); letter-spacing: -0.3px; }
+.cobro-actions { display: flex; gap: 8px; align-items: center; }
+
+/* ---- Reportes ---- */
+.report-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--gray-200);
+  margin-bottom: 20px;
+}
+.report-tab {
+  padding: 10px 18px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-500);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all var(--transition);
+}
+.report-tab:hover { color: var(--gray-800); }
+.report-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+@media (max-width: 768px) {
+  .venta-item { grid-template-columns: 1fr 64px 84px 36px; }
+  .venta-item .vi-subtotal { display: none; }
+  .cobro-card { flex-direction: column; align-items: stretch; }
+  .cobro-actions { justify-content: flex-end; }
+  .topbar-right .btn { display: none; }
 }
