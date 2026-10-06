@@ -165,8 +165,18 @@ npm start          # http://localhost:3000
 - Usuario: `admin@sistema.com`
 - Contraseña: `admin123`
 
-> Cambia la contraseña desde *Mi cuenta* (clic en el usuario, abajo a la izquierda) y
+> Cambia la contraseña desde *Mi cuenta* (menú del usuario, arriba a la derecha) y
 > define un `JWT_SECRET` propio antes de usarlo en producción.
+
+**Datos de ejemplo (opcional):** para probar el sistema ya poblado puedes cargar
+datos demo (clientes, productos y ventas de muestra):
+
+```bash
+npm run seed            # solo si la base está vacía
+npm run seed -- --force # forzar aunque ya existan datos
+```
+
+Es un comando aparte, pensado solo para evaluación; no se ejecuta en producción.
 
 ---
 
