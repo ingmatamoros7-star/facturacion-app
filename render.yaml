@@ -2,7 +2,10 @@ services:
   - type: web
     name: facturacion-app
     runtime: node
-    plan: free
+    # "starter" (~7 USD/mes) permite disco persistente para que la base
+    # SQLite NO se borre. Si solo quieres probar gratis, cambia a "free" y
+    # elimina la sección "disk" (los datos serán temporales).
+    plan: starter
     buildCommand: npm install
     startCommand: node server.js
     envVars:

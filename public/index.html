@@ -95,15 +95,20 @@
 
 <!-- MAIN -->
 <main class="main-content">
-  <div class="page-head">
-    <h1 class="page-title" id="page-title">Inicio</h1>
-    <span class="topbar-date" id="topbar-date"></span>
-  </div>
-
   <div class="content-area">
 
     <!-- DASHBOARD -->
     <div id="sec-dashboard" class="section active">
+      <div class="section-header">
+        <div>
+          <h2>Resumen general</h2>
+          <p class="section-subtitle" id="topbar-date"></p>
+        </div>
+        <button class="btn btn-primary" onclick="navigateTo('ventas');setTimeout(showNuevaVenta,150)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nueva venta
+        </button>
+      </div>
       <div class="dashboard-grid" id="dash-metrics"></div>
       <div class="dashboard-panels">
         <div class="panel">

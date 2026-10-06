@@ -194,7 +194,8 @@ function navigateTo(name) {
   const cobranzaTrigger = document.querySelector('.menu-trigger[data-menu="cobranza"]');
   if (cobranzaTrigger) cobranzaTrigger.classList.toggle('active', COBRANZA_SUBS.includes(name));
 
-  document.getElementById('page-title').textContent = pageTitles[name] || name;
+  const pt = document.getElementById('page-title');
+  if (pt) pt.textContent = pageTitles[name] || name;
   closeMobileMenu();
   closeAllDropdowns();
 
@@ -289,12 +290,12 @@ async function loadDashboard() {
   try {
     const d = await api('/api/dashboard');
     document.getElementById('dash-metrics').innerHTML = `
-      ${metricCard('Ventas del día', formatMoney(d.ventas_dia), 'rgba(37,99,235,.1)', '#2563eb', iconSale())}
-      ${metricCard('Ventas del mes', formatMoney(d.ventas_mes), 'rgba(124,58,237,.1)', '#7c3aed', iconChart())}
-      ${metricCard('Total cobrado', formatMoney(d.total_cobrado), 'rgba(16,185,129,.12)', '#10b981', iconCash())}
-      ${metricCard('Por cobrar', formatMoney(d.por_cobrar), 'rgba(245,158,11,.12)', '#d97706', iconWallet())}
+      ${metricCard('Ventas del día', formatMoney(d.ventas_dia), 'rgba(13,148,136,.12)', '#0d9488', iconSale())}
+      ${metricCard('Ventas del mes', formatMoney(d.ventas_mes), 'rgba(15,118,110,.12)', '#0f766e', iconChart())}
+      ${metricCard('Total cobrado', formatMoney(d.total_cobrado), 'rgba(16,185,129,.14)', '#059669', iconCash())}
+      ${metricCard('Por cobrar', formatMoney(d.por_cobrar), 'rgba(245,158,11,.14)', '#d97706', iconWallet())}
       ${metricCard('Cartera vencida', formatMoney(d.cartera_vencida), 'rgba(239,68,68,.1)', '#dc2626', iconAlert())}
-      ${metricCard('Clientes con deuda', String(d.clientes_con_deuda), 'rgba(37,99,235,.1)', '#2563eb', iconUsers())}
+      ${metricCard('Clientes con deuda', String(d.clientes_con_deuda), 'rgba(13,148,136,.12)', '#0d9488', iconUsers())}
     `;
 
     const badge = document.getElementById('cartera-badge');
