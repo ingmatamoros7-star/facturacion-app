@@ -1,64 +1,66 @@
 # Guía de despliegue — VentasPro
 
 Esta guía te lleva paso a paso para publicar el sistema en una **dirección web**
-(ej. `https://ventaspro.onrender.com` o tu dominio `https://sistema.midominio.com`)
-accesible desde cualquier dispositivo.
+(ej. `https://ventaspro.onrender.com` o tu dominio `https://sistema.midominio.com`),
+**gratis y permanente**, accesible desde cualquier dispositivo.
 
-El proyecto ya incluye `render.yaml`, así que el despliegue en **Render** es casi
-automático. Al final se mencionan alternativas (Railway, Fly.io).
+Arquitectura de producción:
 
----
+- **Servidor web:** Render (plan gratuito).
+- **Base de datos:** Turso / libSQL (plan gratuito, permanente). Los datos viven en
+  Turso, no en el servidor, así que nunca se borran aunque Render reinicie.
 
-## Importante: persistencia de datos
-
-El sistema usa **SQLite** (un archivo). Para que la información **no se borre** en
-cada actualización o reinicio, el servidor necesita un **disco persistente**.
-
-| Plan Render | Costo | Disco persistente | ¿Para qué sirve? |
-|-------------|-------|-------------------|------------------|
-| **Starter** | ~$7 USD/mes | ✅ Sí | **Uso real** (datos permanentes) |
-| Free | $0 | ❌ No | Solo pruebas (los datos se borran al reiniciar) |
-
-El `render.yaml` viene configurado en **Starter con disco** (recomendado). Si solo
-quieres probar gratis, cambia `plan: starter` por `plan: free` y borra la sección
-`disk:` — pero recuerda que los datos serán temporales.
-
-> ¿Quieres gratis **y** permanente? Es posible migrando de SQLite a una base
-> PostgreSQL gratuita (Neon/Supabase), pero requiere un cambio de código. Dímelo
-> y lo preparo.
+> Resultado: **$0/mes** (salvo que compres un dominio propio).
 
 ---
 
-## Opción A — Render con Blueprint (recomendada)
+## Paso 1 — Crear la base de datos en Turso
 
-### 1. Requisitos
-- Una cuenta de **GitHub** (ya tienes el repositorio `facturacion-app`).
-- Una cuenta gratuita en **[Render](https://render.com)** (puedes entrar con GitHub).
+1. Entra a **[turso.tech](https://turso.tech)** y crea una cuenta gratuita (puedes usar GitHub).
+2. Crea una base de datos nueva (botón **Create Database**). Elige la región más
+   cercana (ej. `aws-us-east-1`).
+3. Copia los dos datos que necesitarás:
+   - **Database URL** — algo como `libsql://tu-base-xxxx.turso.io`
+   - **Auth Token** — en la base, genera un token (**Create Token**) y cópialo.
 
-### 2. Subir el código a la rama principal
-El código está en la rama del PR. Primero **mergea el Pull Request** a `main`
-(o despliega directamente desde la rama, Render lo permite).
+> Con la CLI de Turso sería:
+> ```bash
+> turso db create ventaspro
+> turso db show ventaspro --url        # -> TURSO_DATABASE_URL
+> turso db tokens create ventaspro     # -> TURSO_AUTH_TOKEN
+> ```
 
-### 3. Crear el servicio con el Blueprint
-1. En Render, clic en **New +** → **Blueprint**.
-2. Conecta tu cuenta de GitHub y selecciona el repositorio **`facturacion-app`**.
-3. Render detecta el archivo `render.yaml` y muestra el servicio **facturacion-app**.
-4. Clic en **Apply** / **Create**.
+Guarda esos dos valores; los pondrás en Render en el Paso 3.
 
-Render ejecutará `npm install` y luego `node server.js`. En 2–4 minutos tendrás una
-URL del tipo `https://facturacion-app-xxxx.onrender.com`.
+---
 
-### 4. Variables de entorno (ya vienen configuradas)
-El `render.yaml` define automáticamente:
+## Paso 2 — Crear el servicio web en Render
+
+1. Entra a **[render.com](https://render.com)** (puedes usar tu cuenta de GitHub).
+2. **Mergea el Pull Request** a `main` (o despliega directo desde la rama).
+3. En Render: **New +** → **Blueprint** → elige el repositorio **`facturacion-app`**.
+4. Render detecta `render.yaml` y muestra el servicio **facturacion-app**. Clic en **Apply**.
+
+---
+
+## Paso 3 — Configurar las variables de entorno
+
+Al aplicar el Blueprint, Render te pedirá los valores de las variables marcadas como
+`sync: false`. Completa:
+
+| Variable | Valor |
+|----------|-------|
+| `TURSO_DATABASE_URL` | la URL `libsql://...` del Paso 1 |
+| `TURSO_AUTH_TOKEN` | el token del Paso 1 |
+
+Estas ya vienen configuradas solas:
 
 | Variable | Valor | Para qué |
 |----------|-------|----------|
 | `NODE_ENV` | `production` | Cookies seguras (HTTPS) |
-| `DB_PATH` | `/opt/render/project/data` | Carpeta del disco persistente |
 | `JWT_SECRET` | *(se genera solo)* | Firma de la sesión |
 
-**Opcional** — para definir tú el primer administrador, agrega en Render →
-*Environment* (antes del primer arranque):
+**Opcional** — para definir tú el primer administrador, agrega antes del primer arranque:
 
 | Variable | Ejemplo |
 |----------|---------|
@@ -67,57 +69,85 @@ El `render.yaml` define automáticamente:
 
 Si no las defines, se crea `admin@sistema.com` / `admin123`.
 
-### 5. Primer acceso
+Guarda y deja que Render despliegue (2–4 min). Obtendrás una URL `https://...onrender.com`.
+
+---
+
+## Paso 4 — Primer acceso
+
 1. Abre la URL que te dio Render.
 2. Inicia sesión con tu usuario admin (o `admin@sistema.com` / `admin123`).
 3. **Cambia la contraseña** desde el menú de usuario (arriba a la derecha) → *Mi cuenta*.
 
-### 6. (Opcional) Datos de ejemplo
-Si quieres ver el sistema poblado para una demo, en Render → *Shell* ejecuta:
+### (Opcional) Datos de ejemplo
+Para ver el sistema poblado en una demo, en Render → **Shell** ejecuta:
 
 ```bash
 npm run seed
 ```
 
-(No lo hagas si ya vas a usarlo con datos reales.)
+(No lo hagas si vas a usarlo con datos reales.)
 
 ---
 
 ## Dominio propio (`https://sistema.midominio.com`)
 
-1. En Render, entra a tu servicio → pestaña **Settings** → **Custom Domains**.
-2. Clic en **Add Custom Domain** e ingresa `sistema.midominio.com`.
-3. Render te dará un registro **CNAME**. Entra al panel de tu dominio (donde lo
-   compraste) y crea ese CNAME apuntando al valor que indica Render.
-4. Espera unos minutos: Render emite el certificado **HTTPS** automáticamente.
+1. Render → tu servicio → **Settings** → **Custom Domains** → **Add Custom Domain**.
+2. Ingresa `sistema.midominio.com`. Render te dará un registro **CNAME**.
+3. En el panel de tu dominio, crea ese CNAME apuntando al valor de Render.
+4. En minutos Render emite el certificado **HTTPS** automáticamente.
 
 ---
 
-## Actualizaciones futuras
+## Nota sobre el plan gratuito de Render
 
-Cada vez que hagas `git push` a la rama conectada, Render **redespliega solo**.
-No se pierde la base de datos porque vive en el disco persistente.
+El plan gratuito de Render **suspende** el servicio tras ~15 min de inactividad; la
+primera visita después tarda unos segundos en "despertar". Los **datos no se pierden**
+(están en Turso). Si quieres que esté siempre encendido, sube el servicio al plan
+**Starter (~$7/mes)**; la base de datos sigue siendo gratis en Turso.
 
 ---
 
 ## Respaldos de la base de datos
 
-La información está en `/opt/render/project/data/facturacion.db`.
+Con la CLI de Turso:
 
-- **Descargar un respaldo:** Render → tu servicio → **Shell**, y revisa el archivo
-  (o usa un comando para copiarlo). Guarda `facturacion.db` en lugar seguro con
-  regularidad.
-- Recomendado: hacer respaldo antes de cambios grandes.
+```bash
+turso db shell ventaspro ".dump" > respaldo.sql     # exportar
+```
+
+Hazlo periódicamente (y antes de cambios grandes). Turso también mantiene réplicas y
+punto-en-el-tiempo según el plan.
 
 ---
 
-## Checklist de seguridad (antes de usarlo en producción)
+## Actualizaciones futuras
 
-- [ ] `JWT_SECRET` propio (Render ya lo genera; no lo compartas).
+Cada `git push` a la rama conectada hace que Render **redespliegue solo**. Los datos
+permanecen intactos en Turso.
+
+---
+
+## Desarrollo local (sin configurar nada)
+
+Si no defines `TURSO_DATABASE_URL`, el sistema usa un archivo SQLite local
+(`facturacion.db`) automáticamente:
+
+```bash
+npm install
+npm run seed     # opcional: datos de ejemplo
+npm start        # http://localhost:3000
+```
+
+---
+
+## Checklist de seguridad (antes de producción)
+
+- [ ] `JWT_SECRET` propio (Render lo genera; no lo compartas).
 - [ ] Contraseña del administrador cambiada (no dejar `admin123`).
+- [ ] `TURSO_AUTH_TOKEN` tratado como secreto (nunca en el repositorio).
 - [ ] `NODE_ENV=production` (ya configurado) para cookies seguras.
-- [ ] Plan con disco persistente (Starter) si guardas datos reales.
-- [ ] Respaldos periódicos de `facturacion.db`.
+- [ ] Respaldos periódicos de la base en Turso.
 
 ---
 
@@ -125,9 +155,9 @@ La información está en `/opt/render/project/data/facturacion.db`.
 
 | Plataforma | Notas | Costo aprox. |
 |------------|-------|--------------|
-| **Railway** | Despliegue desde GitHub, agrega un *Volume* para SQLite | ~$5 USD/mes |
-| **Fly.io** | Requiere un *Volume* para persistencia | desde ~$2–5 USD/mes |
-| **VPS** (Hetzner, DigitalOcean) | Más control, instalas Node + PM2 + Nginx | ~$4–6 USD/mes |
+| **Railway** | Despliegue desde GitHub; usa las mismas variables `TURSO_*` | $0–5 USD/mes |
+| **Fly.io** | Igual, con las variables `TURSO_*` como secrets | $0–5 USD/mes |
+| **VPS** (Hetzner, DigitalOcean) | Node + PM2 + Nginx; variables `TURSO_*` en el entorno | ~$4–6 USD/mes |
 
-En todas, el principio es el mismo: ejecutar `node server.js`, exponer el puerto por
-HTTPS y montar un disco/volumen para que `facturacion.db` persista.
+En todas, la base de datos sigue siendo Turso (gratis), así que solo cambias dónde corre
+`node server.js`.

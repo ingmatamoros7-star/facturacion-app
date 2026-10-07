@@ -1,20 +1,57 @@
-const Database = require('better-sqlite3');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const { createClient } = require('@libsql/client');
 
-// En producción (ej. Render) usar disco persistente vía DB_PATH;
-// localmente, guardar el archivo junto al proyecto.
-const dbPath = process.env.DB_PATH
-  ? path.join(process.env.DB_PATH, 'facturacion.db')
-  : path.join(__dirname, 'facturacion.db');
+/*
+ * Base de datos: Turso / libSQL (compatible con SQLite).
+ *
+ * - En producción: define TURSO_DATABASE_URL (libsql://...) y TURSO_AUTH_TOKEN.
+ * - En local / sin esas variables: usa un archivo SQLite local (file:...),
+ *   guardado en DB_PATH si existe, o junto al proyecto.
+ */
+const localFile = process.env.DB_PATH
+  ? 'file:' + path.join(process.env.DB_PATH, 'facturacion.db')
+  : 'file:' + path.join(__dirname, 'facturacion.db');
 
-const db = new Database(dbPath);
+const url = process.env.TURSO_DATABASE_URL || localFile;
+const authToken = process.env.TURSO_AUTH_TOKEN; // solo necesario para Turso remoto
 
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+const client = createClient({ url, authToken });
 
-// ============ ESQUEMA ============
-db.exec(`
+// ---- Helpers (convierten las filas a objetos planos) ----
+function toPlain(res) {
+  return res.rows.map((row) => {
+    const o = {};
+    for (const c of res.columns) o[c] = row[c];
+    return o;
+  });
+}
+
+async function all(sql, args = []) {
+  const res = await client.execute({ sql, args });
+  return toPlain(res);
+}
+
+async function get(sql, args = []) {
+  const rows = await all(sql, args);
+  return rows[0];
+}
+
+async function run(sql, args = []) {
+  const res = await client.execute({ sql, args });
+  return {
+    lastInsertRowid: res.lastInsertRowid != null ? Number(res.lastInsertRowid) : undefined,
+    changes: res.rowsAffected,
+  };
+}
+
+// Transacción de escritura: devuelve un objeto con execute/commit/rollback.
+async function tx() {
+  return client.transaction('write');
+}
+
+// ---- Esquema ----
+const SCHEMA = `
   CREATE TABLE IF NOT EXISTS usuarios (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nombre TEXT NOT NULL,
@@ -24,7 +61,6 @@ db.exec(`
     activo INTEGER NOT NULL DEFAULT 1,
     creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
   );
-
   CREATE TABLE IF NOT EXISTS clientes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nombre TEXT NOT NULL,
@@ -36,7 +72,6 @@ db.exec(`
     activo INTEGER NOT NULL DEFAULT 1,
     creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
   );
-
   CREATE TABLE IF NOT EXISTS productos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     codigo TEXT,
@@ -46,7 +81,6 @@ db.exec(`
     activo INTEGER NOT NULL DEFAULT 1,
     creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
   );
-
   CREATE TABLE IF NOT EXISTS ventas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     numero TEXT,
@@ -63,7 +97,6 @@ db.exec(`
     creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (cliente_id) REFERENCES clientes(id)
   );
-
   CREATE TABLE IF NOT EXISTS detalle_ventas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     venta_id INTEGER NOT NULL,
@@ -75,7 +108,6 @@ db.exec(`
     FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE,
     FOREIGN KEY (producto_id) REFERENCES productos(id)
   );
-
   CREATE TABLE IF NOT EXISTS pagos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     venta_id INTEGER NOT NULL,
@@ -87,53 +119,51 @@ db.exec(`
     FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE,
     FOREIGN KEY (cliente_id) REFERENCES clientes(id)
   );
-
   CREATE INDEX IF NOT EXISTS idx_ventas_cliente ON ventas(cliente_id);
   CREATE INDEX IF NOT EXISTS idx_detalle_venta ON detalle_ventas(venta_id);
   CREATE INDEX IF NOT EXISTS idx_pagos_venta ON pagos(venta_id);
-`);
+`;
 
-// ============ MIGRACIONES SUAVES ============
-// Agrega columnas nuevas a instalaciones existentes sin perder datos.
-function ensureColumn(table, column, definition) {
-  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+async function ensureColumn(table, column, definition) {
+  const cols = await all(`PRAGMA table_info(${table})`);
   if (!cols.some((c) => c.name === column)) {
-    db.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
+    await client.execute(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
   }
 }
 
-ensureColumn('clientes', 'identificacion', 'identificacion TEXT');
-ensureColumn('clientes', 'activo', 'activo INTEGER NOT NULL DEFAULT 1');
-ensureColumn('productos', 'codigo', 'codigo TEXT');
-ensureColumn('ventas', 'numero', 'numero TEXT');
-ensureColumn('ventas', 'subtotal', 'subtotal REAL NOT NULL DEFAULT 0');
-ensureColumn('ventas', 'descuento', 'descuento REAL NOT NULL DEFAULT 0');
-ensureColumn('ventas', 'forma_pago', "forma_pago TEXT NOT NULL DEFAULT 'efectivo'");
-ensureColumn('ventas', 'fecha_vencimiento', 'fecha_vencimiento DATE');
-ensureColumn('ventas', 'creado_en', 'creado_en DATETIME');
-ensureColumn('pagos', 'cliente_id', 'cliente_id INTEGER');
+// Inicializa el esquema, migraciones suaves y el usuario admin por defecto.
+async function init() {
+  await client.executeMultiple(SCHEMA);
 
-// Rellenar numero/subtotal en ventas antiguas que no lo tengan.
-db.prepare(
-  `UPDATE ventas SET numero = 'V-' || substr('000000' || id, -6, 6) WHERE numero IS NULL OR numero = ''`
-).run();
-db.prepare(`UPDATE ventas SET subtotal = total WHERE subtotal = 0 AND total > 0`).run();
+  await ensureColumn('clientes', 'identificacion', 'identificacion TEXT');
+  await ensureColumn('clientes', 'activo', 'activo INTEGER NOT NULL DEFAULT 1');
+  await ensureColumn('productos', 'codigo', 'codigo TEXT');
+  await ensureColumn('ventas', 'numero', 'numero TEXT');
+  await ensureColumn('ventas', 'subtotal', 'subtotal REAL NOT NULL DEFAULT 0');
+  await ensureColumn('ventas', 'descuento', 'descuento REAL NOT NULL DEFAULT 0');
+  await ensureColumn('ventas', 'forma_pago', "forma_pago TEXT NOT NULL DEFAULT 'efectivo'");
+  await ensureColumn('ventas', 'fecha_vencimiento', 'fecha_vencimiento DATE');
+  await ensureColumn('ventas', 'creado_en', 'creado_en DATETIME');
+  await ensureColumn('pagos', 'cliente_id', 'cliente_id INTEGER');
 
-// ============ USUARIO ADMIN POR DEFECTO ============
-const totalUsuarios = db.prepare('SELECT COUNT(*) AS n FROM usuarios').get().n;
-if (totalUsuarios === 0) {
-  const email = process.env.ADMIN_EMAIL || 'admin@sistema.com';
-  const password = process.env.ADMIN_PASSWORD || 'admin123';
-  const hash = bcrypt.hashSync(password, 10);
-  db.prepare(
-    'INSERT INTO usuarios (nombre, email, password_hash, rol) VALUES (?, ?, ?, ?)'
-  ).run('Administrador', email, hash, 'admin');
-  console.log('------------------------------------------------------------');
-  console.log(' Usuario administrador creado:');
-  console.log('   Email:    ' + email);
-  console.log('   Password: ' + password);
-  console.log(' Cambia la contraseña desde el módulo de Usuarios.');
-  console.log('------------------------------------------------------------');
+  await run(`UPDATE ventas SET numero = 'V-' || substr('000000' || id, -6, 6) WHERE numero IS NULL OR numero = ''`);
+  await run(`UPDATE ventas SET subtotal = total WHERE subtotal = 0 AND total > 0`);
+
+  const { n } = (await get('SELECT COUNT(*) AS n FROM usuarios')) || { n: 0 };
+  if (!n) {
+    const email = process.env.ADMIN_EMAIL || 'admin@sistema.com';
+    const password = process.env.ADMIN_PASSWORD || 'admin123';
+    const hash = bcrypt.hashSync(password, 10);
+    await run('INSERT INTO usuarios (nombre, email, password_hash, rol) VALUES (?, ?, ?, ?)', [
+      'Administrador', email, hash, 'admin',
+    ]);
+    console.log('------------------------------------------------------------');
+    console.log(' Usuario administrador creado:');
+    console.log('   Email:    ' + email);
+    console.log('   Password: ' + password);
+    console.log(' Cambia la contraseña desde "Mi cuenta".');
+    console.log('------------------------------------------------------------');
+  }
 }
 
-module.exports = db;
+module.exports = { client, all, get, run, tx, init };

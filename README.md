@@ -25,19 +25,20 @@ Servidor Node.js + Express  ──►  Base de datos SQLite (archivo en disco pe
 - **Frontend:** HTML + CSS + JavaScript puro (sin framework). Carga rápido, funciona en
   cualquier dispositivo y es muy fácil de mantener.
 - **Backend:** Node.js con Express. Expone una API REST y sirve la página web.
-- **Base de datos:** SQLite (un solo archivo). Confiable, sin servidor de BD aparte y
-  suficiente para miles de registros. Migrar a PostgreSQL más adelante es directo.
+- **Base de datos:** **Turso (libSQL)** en producción — base compatible con SQLite, en la
+  nube, con plan gratuito permanente. En desarrollo usa un archivo SQLite local
+  automáticamente (sin configurar nada). Confiable y suficiente para miles de registros.
 - **Autenticación:** sesión con token JWT en cookie `httpOnly` + contraseñas cifradas con bcrypt.
 
 ### ¿Por qué esta tecnología?
 
 | Prioridad | Cómo se cumple |
 |-----------|----------------|
-| Bajo costo | Node + SQLite corre en el plan gratuito de Render/Railway/Fly |
+| Bajo costo | Render (plan gratuito) + Turso (plan gratuito) = **$0/mes** |
 | Fácil mantenimiento | Un solo lenguaje (JS), sin framework que aprender |
 | Seguridad razonable | Login obligatorio, contraseñas cifradas, cookies httpOnly |
 | Acceso desde cualquier dispositivo | Web responsive |
-| Base de datos confiable | SQLite con modo WAL + disco persistente |
+| Base de datos confiable | Turso (libSQL) gestionado, compatible con SQLite |
 | Ampliable | Estructura modular por carpetas y esquema relacional normalizado |
 
 ---
@@ -113,14 +114,14 @@ Alternativas equivalentes: Railway, Fly.io o un VPS económico.
 
 | Concepto | Costo aproximado |
 |----------|------------------|
-| Hosting (Render/Railway plan free o básico) | **$0 – $7 USD/mes** |
-| Disco persistente para la base de datos | incluido / ~$1 USD/mes |
+| Hosting web (Render, plan gratuito) | **$0 USD/mes** |
+| Base de datos (Turso, plan gratuito) | **$0 USD/mes** |
 | Dominio propio (opcional) | ~$10 – $15 USD/año |
-| **Total típico** | **$0 – $8 USD/mes** |
+| **Total típico** | **$0 USD/mes** (solo el dominio si lo quieres) |
 
 **Posibles costos adicionales futuros:** envío de WhatsApp/SMS automatizado vía API,
-correos transaccionales, respaldos gestionados o migrar a PostgreSQL administrado si el
-volumen crece mucho. Nada de esto es necesario para el MVP.
+correos transaccionales, o un plan de pago de Turso/Render si el volumen crece mucho.
+Nada de esto es necesario para el MVP.
 
 ---
 
@@ -129,7 +130,7 @@ volumen crece mucho. Nada de esto es necesario para el MVP.
 ```
 facturacion-app/
 ├── server.js             # Servidor Express y montaje de rutas
-├── database.js           # Esquema SQLite, migraciones y usuario admin inicial
+├── database.js           # Conexión Turso/libSQL, esquema, migraciones y admin inicial
 ├── render.yaml           # Configuración de despliegue en Render
 ├── .env.example          # Variables de entorno de ejemplo
 ├── lib/

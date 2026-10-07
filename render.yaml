@@ -2,20 +2,18 @@ services:
   - type: web
     name: facturacion-app
     runtime: node
-    # "starter" (~7 USD/mes) permite disco persistente para que la base
-    # SQLite NO se borre. Si solo quieres probar gratis, cambia a "free" y
-    # elimina la sección "disk" (los datos serán temporales).
-    plan: starter
+    # Plan gratuito: los datos NO viven en el servidor sino en Turso (libSQL),
+    # por eso no se necesita disco persistente ni plan de pago.
+    plan: free
     buildCommand: npm install
     startCommand: node server.js
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DB_PATH
-        value: /opt/render/project/data
       - key: JWT_SECRET
         generateValue: true
-    disk:
-      name: facturacion-data
-      mountPath: /opt/render/project/data
-      sizeGB: 1
+      # Define estas dos en el panel de Render (NO las subas al repo):
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false

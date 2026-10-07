@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const db = require('./database');
 const { requireAuth } = require('./middleware/auth');
 
 const app = express();
@@ -30,6 +31,18 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+// Manejo de errores
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ error: 'Error del servidor' });
 });
+
+// Inicializa la base de datos y arranca el servidor
+db.init()
+  .then(() => {
+    app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));
+  })
+  .catch((err) => {
+    console.error('No se pudo inicializar la base de datos:', err);
+    process.exit(1);
+  });
