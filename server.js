@@ -1,26 +1,48 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const path = require('path');
+const db = require('./database');
+const { requireAuth } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
+// Middleware base
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Rutas API
-app.use('/api/clientes', require('./routes/clientes'));
-app.use('/api/productos', require('./routes/productos'));
-app.use('/api/ventas', require('./routes/ventas'));
-app.use('/api/pagos', require('./routes/pagos'));
+// Autenticación (público)
+app.use('/api/auth', require('./routes/auth'));
 
-// Ruta principal - sirve el HTML
+// API protegida (requiere sesión)
+app.use('/api/clientes', requireAuth, require('./routes/clientes'));
+app.use('/api/productos', requireAuth, require('./routes/productos'));
+app.use('/api/ventas', requireAuth, require('./routes/ventas'));
+app.use('/api/pagos', requireAuth, require('./routes/pagos'));
+app.use('/api/dashboard', requireAuth, require('./routes/dashboard'));
+app.use('/api/cobranza', requireAuth, require('./routes/cobranza'));
+app.use('/api/reportes', requireAuth, require('./routes/reportes'));
+
+// Ruta principal (SPA)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+// Manejo de errores
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ error: 'Error del servidor' });
 });
+
+// Inicializa la base de datos y arranca el servidor
+db.init()
+  .then(() => {
+    app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));
+  })
+  .catch((err) => {
+    console.error('No se pudo inicializar la base de datos:', err);
+    process.exit(1);
+  });

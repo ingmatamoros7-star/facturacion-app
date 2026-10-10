@@ -1,15 +1,19 @@
 {
   "name": "facturacion-app",
   "version": "1.0.0",
-  "description": "Sistema de facturación y gestión de clientes",
+  "description": "Sistema interno de ventas y control de cuentas por cobrar",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "seed": "node seed.js"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "better-sqlite3": "^11.0.0",
-    "cors": "^2.8.5"
+    "@libsql/client": "^0.14.0",
+    "cors": "^2.8.5",
+    "cookie-parser": "^1.4.6",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2"
   }
 }
